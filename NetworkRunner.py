@@ -40,33 +40,44 @@ class NetworkRunner:
         self.state = self.current_screen - self.last_screen
         self.episode_cntr = 1
 
+        self.reward = pt.tensor([0], device=self.device)
+        self.done = False
+
+        self.previous_state = self.state
+        self.previous_action = pt.tensor([[0]])
+
     def run(self):
-        reward = pt.tensor([self.receiver.reward], device=self.device)
-        done = self.receiver.game_over
+
+        self.reward = pt.tensor([self.receiver.reward], device=self.device)
+        self.done = self.receiver.game_over
 
         # Observe new state
         self.last_screen = self.current_screen
         self.current_screen = self.get_screen()
 
-        if not done:
+        if not self.done:
             next_state = self.current_screen - self.last_screen
         else:
             self.receiver.image = Image.open("BlackScreen.png")
             next_state = None
 
-        # Store the transition in memory
-        self.agent.memory.push(self.state, self.receiver.action, next_state, reward)
+            # Store the transition in memory
+            # self.agent.memory.push(self.state, self.receiver.action, next_state, self.reward)
+            self.agent.memory.push(self.previous_state, self.previous_action, self.state, self.reward)
 
         # Select and perform an action
+        self.previous_action = self.receiver.action
         self.receiver.action = self.agent.select_action(self.state)
+        print(self.receiver.action)
 
         # Move to the next state
+        self.previous_state = self.state
         self.state = next_state
 
         # Perform one step of the optimization (on the target network)
         self.optimize_model()
 
-        if done:
+        if self.done:
             print("done")
             self.agent.episode_durations.append(self.episode_cntr)
             self.agent.episode_scores.append(self.receiver.cumulative_reward)
@@ -78,7 +89,8 @@ class NetworkRunner:
             self.last_screen = self.current_screen
             self.state = self.current_screen - self.last_screen
             self.receiver.reward = 0
-            self.receiver.next_reward = 0
+            self.reward = pt.tensor([0], device=self.device)
+            self.done = False
             return
 
         # Update the target network, copying all weights and biases in DQN

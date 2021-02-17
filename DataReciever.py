@@ -18,7 +18,6 @@ class ImageReceiver:
         self.connected = False
         self.game_over = False
         self.reward = 0
-        self.next_reward = 0
         self.cumulative_reward = 0
         self.game_cntr = 0
         self.highest_score = -999
@@ -50,11 +49,8 @@ class ImageReceiver:
                             self.active = False
                         else:
                             self.game_over = True if int(data[0]) == 1 else False
-                            self.reward = self.next_reward
-                            self.next_reward = int(data[2]) if int(data[1]) == 0 else int(data[2]) * -1
+                            self.reward = int(data[2]) if int(data[1]) == 0 else int(data[2]) * -1
                             self.data = data[3:]
-                            # if self.game_over:
-                            #     self.reward += self.networkRunner.episode_cntr
                             self.cumulative_reward += self.reward
 
                             if data[3] == 0x89:

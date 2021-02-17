@@ -1,12 +1,10 @@
 import math
 import random
-import numpy as np
 import torch as pt
 import torch.nn as ptnn
 import torch.nn.functional as ptnnf
 import torch.optim as pto
 from collections import namedtuple
-from PIL import Image
 
 Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward'))

@@ -59,7 +59,7 @@ class NetworkRunner:
             next_state = self.current_screen - self.last_screen
         else:
             self.receiver.image = Image.open("BlackScreen.png")
-            next_state = None
+            self.state = None
 
             # Store the transition in memory
             # self.agent.memory.push(self.state, self.receiver.action, next_state, self.reward)
@@ -67,7 +67,7 @@ class NetworkRunner:
 
         # Select and perform an action
         self.previous_action = self.receiver.action
-        self.receiver.action = self.agent.select_action(self.state)
+        self.receiver.action = self.agent.select_action(self.previous_state)
         print(self.receiver.action)
 
         # Move to the next state

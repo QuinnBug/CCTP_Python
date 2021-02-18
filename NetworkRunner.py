@@ -59,7 +59,7 @@ class NetworkRunner:
             next_state = self.current_screen - self.last_screen
         else:
             self.receiver.image = Image.open("BlackScreen.png")
-            self.state = None
+            next_state = None
 
             # Store the transition in memory
             # self.agent.memory.push(self.state, self.receiver.action, next_state, self.reward)
@@ -99,7 +99,8 @@ class NetworkRunner:
 
         self.episode_cntr += 1
 
-        # self.plot_state()
+        # self.plot_state(self.previous_state, figure=3, name="previous")
+        # self.plot_state(self.state, name="current")
 
     def optimize_model(self):
         if len(self.agent.memory) < BATCH_SIZE:
@@ -133,11 +134,11 @@ class NetworkRunner:
         screen = self.receiver.image
         return resize(screen).unsqueeze(0).to(self.device)
 
-    def plot_state(self):
-        plt.figure(1)
+    def plot_state(self, state, figure=1, name="state"):
+        plt.figure(figure)
         plt.clf()
-        plt.imshow(self.state.cpu().squeeze(0).permute(1, 2, 0).numpy(), interpolation='none')
-        plt.title('current state')
+        plt.imshow(state.cpu().squeeze(0).permute(1, 2, 0).numpy(), interpolation='none')
+        plt.title(name)
         plt.pause(0.001)
         if self.is_ipython:
             display.clear_output(wait=True)

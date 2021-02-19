@@ -87,8 +87,13 @@ class Agent:
         sample = random.random()
         eps_threshold = self.eps_min + (self.eps_start - self.eps_min) * math.exp(-1. * self.steps_done / self.eps_dec)
         self.steps_done += 1
+
+        if self.nr.receiver.game_cntr % 25 == 0:
+            print("BEST TEST")
+            sample = 1
+
         if sample > eps_threshold:
-            print("best action - eps current/sample")
+            print("best action")
             with pt.no_grad():
                 # t.max(1) will return largest column value of each row.
                 # second column on max result is index of where max element was

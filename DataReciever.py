@@ -8,6 +8,7 @@ import random
 HOST = '127.0.0.1'
 PORT = 65432
 SIZE = 200000
+MODEL_PATH = "D:/Documents/Coding/CCTP_QM_2021/Models/first_save"
 
 
 class ImageReceiver:
@@ -26,10 +27,16 @@ class ImageReceiver:
         self.networkRunner = NetworkRunner(self)
         self.action = pt.tensor([[random.randrange(4)]])
 
+        # uncomment the next line to load from last session
+        # self.networkRunner.agent.load_models(MODEL_PATH)
+
     def update(self):
         if self.listening == 0:
             # listen for data and say we're listening for data
             self.receive()
+
+    def save_models(self):
+        self.networkRunner.agent.save_models(MODEL_PATH)
 
     def receive(self):
         with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
@@ -42,7 +49,6 @@ class ImageReceiver:
                 self.connected = True
                 self.game_cntr += 1
                 while self.active:
-                    # print("listening for data")
                     data = conn.recv(SIZE)
                     if data:
                         if len(data) < 2:
@@ -86,4 +92,3 @@ class ImageReceiver:
 
                 self.active = True
                 self.connected = False
-

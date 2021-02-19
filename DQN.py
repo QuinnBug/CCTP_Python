@@ -56,7 +56,8 @@ class DQN(ptnn.Module):
 
 
 class Agent:
-    def __init__(self, device, n_actions, eps_start, eps_min, eps_dec, screen_size, network_runner):
+    def __init__(self, device, n_actions, eps_start, eps_min, eps_dec, screen_size, network_runner, load_path="NONE"):
+        self.load = load_path
         self.device = device
 
         # Set self.params
@@ -72,9 +73,6 @@ class Agent:
 
         self.policy_net = DQN(screen_height, screen_width, self.n_actions).to(device)
         self.target_net = DQN(screen_height, screen_width, self.n_actions).to(device)
-        self.target_net.load_state_dict(self.policy_net.state_dict())
-        self.target_net.eval()
-
         self.optimizer = pto.RMSprop(self.policy_net.parameters())
         self.memory = ReplayMemory(10000)
 
@@ -82,6 +80,36 @@ class Agent:
         self.episode_scores = []
 
         self.steps_done = 0
+
+        self.target_net.load_state_dict(self.policy_net.state_dict())
+        self.target_net.eval()
+
+        if self.load != "NONE":
+            self.load_models(self.load)
+
+    def save_models(self, path):
+        pt.save({
+            'model_state_dict_p': self.policy_net.state_dict(),
+            'model_state_dict_t': self.target_net.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict(),
+            'steps_done': self.steps_done,
+            'episode_scores': self.episode_scores,
+            'episode_durations': self.episode_durations,
+            'memory': self.memory
+        }, path)
+
+    def load_models(self, path):
+        checkpoint = pt.load(path)
+        self.policy_net.load_state_dict(checkpoint['model_state_dict_p'])
+        self.target_net.load_state_dict(checkpoint['model_state_dict_t'])
+        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        self.steps_done = checkpoint['steps_done']
+        self.episode_scores = checkpoint['episode_scores']
+        self.episode_durations = checkpoint['episode_durations']
+        self.memory = checkpoint['memory']
+
+        self.policy_net.eval()
+        self.target_net.eval()
 
     def select_action(self, state):
         sample = random.random()

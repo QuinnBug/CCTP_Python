@@ -8,7 +8,7 @@ import random
 HOST = '127.0.0.1'
 PORT = 65432
 SIZE = 200000
-MODEL_PATH = "C:/Users/Quinn/Documents/CCTP_Python/PTModels/test_2_model"
+MODEL_PATH = "D:/Documents/Coding/CCTP_Model/model_1"
 
 
 class ImageReceiver:
@@ -27,7 +27,7 @@ class ImageReceiver:
         self.networkRunner = NetworkRunner(self)
         self.action = pt.tensor([[random.randrange(3)]])
 
-        # uncomment the next line to load from last session
+        # comment out the next line to start a new model with the model path file name
         # self.networkRunner.agent.load_models(MODEL_PATH)
 
     def update(self):
@@ -66,18 +66,18 @@ class ImageReceiver:
 
                                 ba = self.action.numpy().tobytes()
                                 conn.sendall(ba)
-                                # print("completed episode/game: ")
-                                # print(self.networkRunner.episode_cntr)
-                                # print(self.game_cntr)
+                                print("completed episode/game: ")
+                                print(self.networkRunner.episode_cntr)
+                                print(self.game_cntr)
                                 print("reward = ")
                                 print(self.reward)
-                                # print(self.cumulative_reward)
+                                print(self.cumulative_reward)
 
                                 if self.game_over:
                                     print("cumulative reward = ")
                                     print(self.cumulative_reward)
-                                    # print("highest reward = ")
-                                    # print(self.highest_score)
+                                    print("highest reward = ")
+                                    print(self.highest_score)
 
                                     # update the highest score
                                     if self.cumulative_reward > self.highest_score:

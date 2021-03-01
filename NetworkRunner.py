@@ -11,8 +11,8 @@ import numpy as np
 BATCH_SIZE = 128
 GAMMA = 0.999
 EPS_START = 0.9
-EPS_END = 0.1
-EPS_DECAY = 1000
+EPS_END = 0.05
+EPS_DECAY = 200
 TARGET_UPDATE = 25
 SCREEN_SIZE = 128
 ACTION_COUNT = 3
@@ -38,8 +38,7 @@ class NetworkRunner:
         # Initialize the environment and state
         self.last_screen = self.get_screen()
         self.current_screen = self.get_screen()
-        # self.state = self.current_screen - self.last_screen
-        self.state = self.current_screen
+        self.state = self.current_screen - self.last_screen
         self.episode_cntr = 1
 
         self.reward = pt.tensor([0], device=self.device)
@@ -49,7 +48,6 @@ class NetworkRunner:
         self.previous_action = pt.tensor([[0]])
 
     def run(self):
-
         self.reward = pt.tensor([self.receiver.reward], device=self.device)
         self.done = self.receiver.game_over
 
@@ -58,23 +56,20 @@ class NetworkRunner:
         self.current_screen = self.get_screen()
 
         if not self.done:
-            next_state = self.current_screen
+            next_state = self.current_screen - self.last_screen
         else:
             self.receiver.image = Image.open("BlackScreen.png")
             next_state = None
 
-            # Store the transition in memory
-            # self.agent.memory.push(self.state, self.receiver.action, next_state, self.reward)
-            self.agent.memory.push(self.previous_state, self.previous_action, self.state, self.reward)
-
-        # Select and perform an action
-        self.previous_action = self.receiver.action
-        self.receiver.action = self.agent.select_action(self.previous_state)
-        print(self.receiver.action)
+        # Store the transition in memory
+        self.agent.memory.push(self.state, self.receiver.action, next_state, self.reward)
 
         # Move to the next state
-        self.previous_state = self.state
         self.state = next_state
+
+        # Select an action to send to the env
+        if self.state is not None:
+            self.receiver.action = self.agent.select_action(self.state)
 
         # Perform one step of the optimization (on the target network)
         self.optimize_model()
@@ -84,7 +79,7 @@ class NetworkRunner:
             self.agent.episode_durations.append(self.episode_cntr)
             self.agent.episode_scores.append(self.receiver.cumulative_reward)
             # if self.receiver.game_cntr % 25 == 0:
-            #     self.plot_graphs()
+            #    self.plot_graphs()
 
             self.episode_cntr = 0
             self.current_screen = self.get_screen()
@@ -101,8 +96,7 @@ class NetworkRunner:
 
         self.episode_cntr += 1
 
-        self.plot_state(self.previous_state, figure=3, name="previous")
-        # self.plot_state(self.state, name="current")
+        # self.plot_state(self.state, name="current state")
 
     def optimize_model(self):
         if len(self.agent.memory) < BATCH_SIZE:
@@ -174,7 +168,7 @@ class NetworkRunner:
                 i += 1
 
         if len(scores_t) >= 100:
-            plt.plot(self.agent.score_means.numpy())
+            plt.plot(self.agent.score_means)
 
         plt.pause(0.001)  # pause a bit so that plots are updated
         if self.is_ipython:

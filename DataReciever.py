@@ -8,7 +8,7 @@ import random
 HOST = '127.0.0.1'
 PORT = 65432
 SIZE = 200000
-MODEL_PATH = "D:/Documents/Coding/CCTP_QM_2021/Models/first_save"
+MODEL_PATH = "C:/Users/Quinn/Documents/CCTP_Python/PTModels/test_2_model"
 
 
 class ImageReceiver:
@@ -25,7 +25,7 @@ class ImageReceiver:
         self.data = []
         self.image = Image.open("BlackScreen.png")
         self.networkRunner = NetworkRunner(self)
-        self.action = pt.tensor([[random.randrange(4)]])
+        self.action = pt.tensor([[random.randrange(3)]])
 
         # uncomment the next line to load from last session
         # self.networkRunner.agent.load_models(MODEL_PATH)
@@ -66,18 +66,18 @@ class ImageReceiver:
 
                                 ba = self.action.numpy().tobytes()
                                 conn.sendall(ba)
-                                print("completed episode/game: ")
-                                print(self.networkRunner.episode_cntr)
-                                print(self.game_cntr)
-                                print("reward/cumulative reward = ")
+                                # print("completed episode/game: ")
+                                # print(self.networkRunner.episode_cntr)
+                                # print(self.game_cntr)
+                                print("reward = ")
                                 print(self.reward)
-                                print(self.cumulative_reward)
+                                # print(self.cumulative_reward)
 
                                 if self.game_over:
                                     print("cumulative reward = ")
                                     print(self.cumulative_reward)
-                                    print("highest reward = ")
-                                    print(self.highest_score)
+                                    # print("highest reward = ")
+                                    # print(self.highest_score)
 
                                     # update the highest score
                                     if self.cumulative_reward > self.highest_score:

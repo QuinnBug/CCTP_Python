@@ -6,15 +6,16 @@ from collections import namedtuple
 from PIL import Image
 import matplotlib.pyplot as plt
 from IPython import display
+import numpy as np
 
 BATCH_SIZE = 128
 GAMMA = 0.999
 EPS_START = 0.9
-EPS_END = 0.05
-EPS_DECAY = 20000
+EPS_END = 0.1
+EPS_DECAY = 1000
 TARGET_UPDATE = 25
 SCREEN_SIZE = 128
-ACTION_COUNT = 4
+ACTION_COUNT = 3
 
 resize = tv.Compose([tv.Resize(SCREEN_SIZE, interpolation=Image.CUBIC),
                      tv.ToTensor()])
@@ -37,7 +38,8 @@ class NetworkRunner:
         # Initialize the environment and state
         self.last_screen = self.get_screen()
         self.current_screen = self.get_screen()
-        self.state = self.current_screen - self.last_screen
+        # self.state = self.current_screen - self.last_screen
+        self.state = self.current_screen
         self.episode_cntr = 1
 
         self.reward = pt.tensor([0], device=self.device)
@@ -56,7 +58,7 @@ class NetworkRunner:
         self.current_screen = self.get_screen()
 
         if not self.done:
-            next_state = self.current_screen - self.last_screen
+            next_state = self.current_screen
         else:
             self.receiver.image = Image.open("BlackScreen.png")
             next_state = None
@@ -81,8 +83,8 @@ class NetworkRunner:
             print("done")
             self.agent.episode_durations.append(self.episode_cntr)
             self.agent.episode_scores.append(self.receiver.cumulative_reward)
-            if self.receiver.game_cntr % 25 == 0:
-                self.plot_graphs()
+            # if self.receiver.game_cntr % 25 == 0:
+            #     self.plot_graphs()
 
             self.episode_cntr = 0
             self.current_screen = self.get_screen()
@@ -99,7 +101,7 @@ class NetworkRunner:
 
         self.episode_cntr += 1
 
-        # self.plot_state(self.previous_state, figure=3, name="previous")
+        self.plot_state(self.previous_state, figure=3, name="previous")
         # self.plot_state(self.state, name="current")
 
     def optimize_model(self):
@@ -147,23 +149,32 @@ class NetworkRunner:
     def plot_graphs(self):
         plt.figure(2)
         plt.clf()
-        durations_t = pt.tensor(self.agent.episode_durations, dtype=pt.float)
+        # durations_t = pt.tensor(self.agent.episode_durations, dtype=pt.float)
         scores_t = pt.tensor(self.agent.episode_scores, dtype=pt.float)
         plt.title('Training...')
         plt.xlabel('Episode')
         plt.ylabel('Duration & Score')
-        plt.plot(durations_t.numpy())
+        # plt.plot(durations_t.numpy())
         plt.plot(scores_t.numpy())
 
-        if len(durations_t) >= 100:
-            means = durations_t.unfold(0, 100, 1).mean(1).view(-1)
-            means = pt.cat((pt.zeros(99), means))
-            plt.plot(means.numpy())
+        # if len(durations_t) >= 100:
+        #     means = durations_t.unfold(0, 100, 1).mean(1).view(-1)
+        #     means = pt.cat((pt.zeros(99), means))
+        #     plt.plot(means.numpy())
+
+        if len(scores_t) % 100 == 0 & len(scores_t) >= 100:
+            hundo_count = len(scores_t) / 100
+            i = 0
+            j = 0
+            self.agent.score_means = []
+            while i <= hundo_count:
+                while j <= 100:
+                    self.agent.score_means.append(np.sum(self.agent.episode_scores[i*100, (i*100) + 101]))
+                    j += 1
+                i += 1
 
         if len(scores_t) >= 100:
-            means = scores_t.unfold(0, 100, 1).mean(1).view(-1)
-            means = pt.cat((pt.zeros(99), means))
-            plt.plot(means.numpy())
+            plt.plot(self.agent.score_means.numpy())
 
         plt.pause(0.001)  # pause a bit so that plots are updated
         if self.is_ipython:

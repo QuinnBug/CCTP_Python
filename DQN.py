@@ -78,6 +78,7 @@ class Agent:
 
         self.episode_durations = []
         self.episode_scores = []
+        self.score_means = []
 
         self.steps_done = 0
 
@@ -121,12 +122,9 @@ class Agent:
             sample = 1
 
         if sample > eps_threshold:
-            print("best action")
+            # print("best action")
             with pt.no_grad():
-                # t.max(1) will return largest column value of each row.
-                # second column on max result is index of where max element was
-                # found, so we pick action with the larger expected reward.
                 return self.policy_net(state).max(1)[1].view(1, 1)
         else:
-            print("random action - eps current/sample")
+            # print("random action")
             return pt.tensor([[random.randrange(self.n_actions)]], device=self.device, dtype=pt.long)

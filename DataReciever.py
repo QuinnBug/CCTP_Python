@@ -69,15 +69,15 @@ class ImageReceiver:
                                 print("completed episode/game: ")
                                 print(self.networkRunner.episode_cntr)
                                 print(self.game_cntr)
-                                print("reward = ")
-                                print(self.reward)
-                                print(self.cumulative_reward)
+                                # print("reward = ")
+                                # print(self.reward)
+                                # print(self.cumulative_reward)
 
                                 if self.game_over:
                                     print("cumulative reward = ")
                                     print(self.cumulative_reward)
-                                    print("highest reward = ")
-                                    print(self.highest_score)
+                                    # print("highest reward = ")
+                                    # print(self.highest_score)
 
                                     # update the highest score
                                     if self.cumulative_reward > self.highest_score:

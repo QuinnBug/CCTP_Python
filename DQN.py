@@ -120,6 +120,8 @@ class Agent:
         if self.nr.receiver.game_cntr % 25 == 0:
             print("BEST TEST")
             sample = 1
+        # removing e_greedy for testing purposes
+        sample = 1
 
         if sample > eps_threshold:
             # print("best action")

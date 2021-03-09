@@ -12,7 +12,7 @@ BATCH_SIZE = 128
 GAMMA = 0.999
 EPS_START = 0.9
 EPS_END = 0.05
-EPS_DECAY = 200
+EPS_DECAY = 100
 TARGET_UPDATE = 25
 SCREEN_SIZE = 128
 ACTION_COUNT = 3
@@ -46,6 +46,7 @@ class NetworkRunner:
 
         self.previous_state = self.state
         self.previous_action = pt.tensor([[0]])
+        self.losses = []
 
     def run(self):
         self.reward = pt.tensor([self.receiver.reward], device=self.device)
@@ -58,7 +59,6 @@ class NetworkRunner:
         if not self.done:
             next_state = self.current_screen - self.last_screen
         else:
-            self.receiver.image = Image.open("BlackScreen.png")
             next_state = None
 
         # Store the transition in memory
@@ -78,6 +78,7 @@ class NetworkRunner:
             print("done")
             self.agent.episode_durations.append(self.episode_cntr)
             self.agent.episode_scores.append(self.receiver.cumulative_reward)
+            self.receiver.image = Image.open("BlackScreen.png")
             # if self.receiver.game_cntr % 25 == 0:
             #    self.plot_graphs()
 
@@ -96,7 +97,10 @@ class NetworkRunner:
 
         self.episode_cntr += 1
 
-        # self.plot_state(self.state, name="current state")
+        # self.plot_state(self.state, name="state")
+        # self.plot_state(self.last_screen, name="last", figure=4)
+        self.plot_losses()
+        self.plot_state(self.current_screen, name="current", figure=5)
 
     def optimize_model(self):
         if len(self.agent.memory) < BATCH_SIZE:
@@ -119,9 +123,14 @@ class NetworkRunner:
         expected_state_action_values = (next_state_values * GAMMA) + reward_batch
 
         loss = ptnnf.smooth_l1_loss(state_action_values, expected_state_action_values.unsqueeze(1))
-
         self.agent.optimizer.zero_grad()
+
         loss.backward()
+
+        print("loss")
+        print(loss)
+        self.losses.append(loss)
+
         for param in self.agent.policy_net.parameters():
             param.grad.data.clamp_(-1, 1)
         self.agent.optimizer.step()
@@ -130,7 +139,7 @@ class NetworkRunner:
         screen = self.receiver.image
         return resize(screen).unsqueeze(0).to(self.device)
 
-    def plot_state(self, state, figure=1, name="state"):
+    def plot_state(self, state, figure=3, name="state"):
         plt.figure(figure)
         plt.clf()
         plt.imshow(state.cpu().squeeze(0).permute(1, 2, 0).numpy(), interpolation='none')
@@ -139,6 +148,15 @@ class NetworkRunner:
         if self.is_ipython:
             display.clear_output(wait=True)
             display.display(plt.gcf())
+
+    def plot_losses(self):
+        plt.figure(1)
+        plt.clf()
+        losses_t = pt.tensor(self.losses, dtype=pt.float)
+        plt.title('Training...')
+        plt.xlabel('Episode')
+        plt.ylabel('loss')
+        plt.plot(losses_t.numpy())
 
     def plot_graphs(self):
         plt.figure(2)

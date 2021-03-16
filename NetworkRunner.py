@@ -79,8 +79,8 @@ class NetworkRunner:
             self.agent.episode_durations.append(self.episode_cntr)
             self.agent.episode_scores.append(self.receiver.cumulative_reward)
             self.receiver.image = Image.open("BlackScreen.png")
-            # if self.receiver.game_cntr % 25 == 0:
-            #    self.plot_graphs()
+            if self.receiver.game_cntr % 25 == 0:
+                self.plot_graphs()
 
             self.episode_cntr = 0
             self.current_screen = self.get_screen()
@@ -100,7 +100,7 @@ class NetworkRunner:
         # self.plot_state(self.state, name="state")
         # self.plot_state(self.last_screen, name="last", figure=4)
         self.plot_losses()
-        self.plot_state(self.current_screen, name="current", figure=5)
+        # self.plot_state(self.current_screen, name="current", figure=5)
 
     def optimize_model(self):
         if len(self.agent.memory) < BATCH_SIZE:

@@ -9,6 +9,9 @@ from collections import namedtuple
 Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward'))
 
+STRIDE = 1
+KERNEL = 5
+
 
 class ReplayMemory(object):
 
@@ -33,26 +36,32 @@ class ReplayMemory(object):
 class DQN(ptnn.Module):
     def __init__(self, h, w, outputs):
         super(DQN, self).__init__()
-        self.conv1 = ptnn.Conv2d(3, 16, kernel_size=5, stride=2)
-        self.bn1 = ptnn.BatchNorm2d(16)
-        self.conv2 = ptnn.Conv2d(16, 32, kernel_size=5, stride=2)
-        self.bn2 = ptnn.BatchNorm2d(32)
-        self.conv3 = ptnn.Conv2d(32, 64, kernel_size=5, stride=2)
-        self.bn3 = ptnn.BatchNorm2d(64)
+        self.conv1 = ptnn.Conv2d(3, 8, kernel_size=KERNEL, stride=STRIDE)
+        self.bn1 = ptnn.BatchNorm2d(8)
+        self.conv2 = ptnn.Conv2d(8, 16, kernel_size=KERNEL, stride=STRIDE)
+        self.bn2 = ptnn.BatchNorm2d(16)
+        self.conv3 = ptnn.Conv2d(16, 32, kernel_size=KERNEL, stride=STRIDE)
+        self.bn3 = ptnn.BatchNorm2d(32)
 
-        def conv2d_size_out(size, kernel_size=5, stride=2):
+        def conv2d_size_out(size, kernel_size=KERNEL, stride=STRIDE):
             return (size - (kernel_size - 1) - 1) // stride + 1
 
         convw = conv2d_size_out(conv2d_size_out(conv2d_size_out(w)))
         convh = conv2d_size_out(conv2d_size_out(conv2d_size_out(h)))
-        linear_input_size = convw * convh * 64
-        self.head = ptnn.Linear(linear_input_size, outputs)
+        linear_input_size = convw * convh * 32
+        print("debug DQN messages")
+        print(convh)
+        print(convw)
+        print(linear_input_size)
+        self.fc1 = ptnn.Linear(linear_input_size, 64)
+        self.fc2 = ptnn.Linear(64, outputs)
 
     def forward(self, x):
         x = ptnnf.relu(self.bn1(self.conv1(x)))
         x = ptnnf.relu(self.bn2(self.conv2(x)))
         x = ptnnf.relu(self.bn3(self.conv3(x)))
-        return self.head(x.view(x.size(0), -1))
+        x = ptnnf.relu(self.fc1(x.view(x.size(0), -1)))
+        return self.fc2(x.view(x.size(0), -1))
 
 
 class Agent:
@@ -73,7 +82,7 @@ class Agent:
 
         self.policy_net = DQN(screen_height, screen_width, self.n_actions).to(device)
         self.target_net = DQN(screen_height, screen_width, self.n_actions).to(device)
-        self.optimizer = pto.Adam(self.policy_net.parameters())
+        self.optimizer = pto.RMSprop(self.policy_net.parameters())
         self.memory = ReplayMemory(10000)
 
         self.episode_durations = []
@@ -120,8 +129,8 @@ class Agent:
         if self.nr.receiver.game_cntr % 25 == 0:
             print("BEST TEST")
             sample = 1
-        # removing e_greedy for testing purposes
-        sample = 1
+
+        # sample += 1
 
         if sample > eps_threshold:
             # print("best action")

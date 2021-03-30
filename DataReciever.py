@@ -8,7 +8,7 @@ import random
 HOST = '127.0.0.1'
 PORT = 65432
 SIZE = 200000
-MODEL_PATH = "D:/Documents/Coding/CCTP_Model/model_1"
+MODEL_PATH = "D:/Documents/Coding/CCTP_Model/model_2"
 
 
 class ImageReceiver:
@@ -23,7 +23,7 @@ class ImageReceiver:
         self.game_cntr = 0
         self.highest_score = -999
         self.data = []
-        self.image = Image.open("BlackScreen.png")
+        self.image = Image.open("BlackScreen_128.png")
         self.networkRunner = NetworkRunner(self)
         self.action = pt.tensor([[random.randrange(3)]])
 
@@ -69,6 +69,8 @@ class ImageReceiver:
                                 print("completed episode/game: ")
                                 print(self.networkRunner.episode_cntr)
                                 print(self.game_cntr)
+                                # print("action:")
+                                # print(ba)
                                 # print("reward = ")
                                 # print(self.reward)
                                 # print(self.cumulative_reward)

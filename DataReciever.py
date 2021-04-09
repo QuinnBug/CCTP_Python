@@ -7,7 +7,7 @@ import random
 
 HOST = '127.0.0.1'
 PORT = 65432
-SIZE = 200000
+SIZE = 800000
 MODEL_PATH = "D:/Documents/Coding/CCTP_Model/model_2"
 
 
@@ -24,8 +24,9 @@ class ImageReceiver:
         self.highest_score = -999
         self.data = []
         self.image = Image.open("BlackScreen_128.png")
+        self.images = [self.image, self.image, self.image, self.image, self.image]
         self.networkRunner = NetworkRunner(self)
-        self.action = pt.tensor([[random.randrange(3)]])
+        self.action = pt.tensor([[0, 0, 0, 0, 0]])
 
         # comment out the next line to start a new model with the model path file name
         # self.networkRunner.agent.load_models(MODEL_PATH)
@@ -56,13 +57,28 @@ class ImageReceiver:
                         else:
                             self.game_over = True if int(data[0]) == 1 else False
                             self.reward = int(data[2]) if int(data[1]) == 0 else int(data[2]) * -1
-                            self.data = data[3:]
+
+                            img_data = data[3:].split(b'\x89PNG')
+                            img_data[0] = b'\x89PNG' + img_data[1]
+                            img_data[1] = b'\x89PNG' + img_data[2]
+                            img_data[2] = b'\x89PNG' + img_data[3]
+                            img_data[3] = b'\x89PNG' + img_data[4]
+                            img_data[4] = b'\x89PNG' + img_data[5]
+
+                            # self.data = data[3:]
                             self.cumulative_reward += self.reward
 
                             if data[3] == 0x89:
-                                self.image = Image.open(io.BytesIO(self.data))
+                                # self.image = Image.open(io.BytesIO(self.data))
+                                self.images[0] = Image.open(io.BytesIO(img_data[0]))
+                                self.images[1] = Image.open(io.BytesIO(img_data[1]))
+                                self.images[2] = Image.open(io.BytesIO(img_data[2]))
+                                self.images[3] = Image.open(io.BytesIO(img_data[3]))
+                                self.images[4] = Image.open(io.BytesIO(img_data[4]))
 
                                 self.networkRunner.run()
+
+                                print(self.action)
 
                                 ba = self.action.numpy().tobytes()
                                 conn.sendall(ba)

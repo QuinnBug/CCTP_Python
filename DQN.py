@@ -11,6 +11,7 @@ Transition = namedtuple('Transition',
 
 STRIDE = 1
 KERNEL = 5
+CAM_COUNT = 5
 
 
 class ReplayMemory(object):
@@ -49,19 +50,21 @@ class DQN(ptnn.Module):
         convw = conv2d_size_out(conv2d_size_out(conv2d_size_out(w)))
         convh = conv2d_size_out(conv2d_size_out(conv2d_size_out(h)))
         linear_input_size = convw * convh * 32
-        print("debug DQN messages")
-        print(convh)
-        print(convw)
-        print(linear_input_size)
-        self.fc1 = ptnn.Linear(linear_input_size, 64)
-        self.fc2 = ptnn.Linear(64, outputs)
+        # print("debug DQN messages")
+        # print(convh)
+        # print(convw)
+        # print(linear_input_size)
+        self.fc1 = ptnn.Linear(linear_input_size, 32)
+        self.fc2 = ptnn.Linear(32, outputs)
 
     def forward(self, x):
         x = ptnnf.relu(self.bn1(self.conv1(x)))
         x = ptnnf.relu(self.bn2(self.conv2(x)))
         x = ptnnf.relu(self.bn3(self.conv3(x)))
         x = ptnnf.relu(self.fc1(x.view(x.size(0), -1)))
-        return self.fc2(x.view(x.size(0), -1))
+        x = self.fc2(x.view(x.size(0), -1))
+
+        return x
 
 
 class Agent:
@@ -135,7 +138,11 @@ class Agent:
         if sample > eps_threshold:
             # print("best action")
             with pt.no_grad():
-                return self.policy_net(state).max(1)[1].view(1, 1)
+                x = self.policy_net(state).max(1)[1].view(1, 5)
+                return x
         else:
             # print("random action")
-            return pt.tensor([[random.randrange(self.n_actions)]], device=self.device, dtype=pt.long)
+            return pt.tensor([[random.randrange(self.n_actions), random.randrange(self.n_actions),
+                               random.randrange(self.n_actions), random.randrange(self.n_actions),
+                               random.randrange(self.n_actions)]],
+                             device=self.device, dtype=pt.long)

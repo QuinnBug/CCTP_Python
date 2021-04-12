@@ -23,7 +23,7 @@ resize = tv.Compose([tv.Resize(SCREEN_SIZE, interpolation=Image.CUBIC),
                      tv.ToTensor()])
 
 Transition = namedtuple('Transition',
-                        ('state', 'action', 'next_state', 'reward'))
+                        ('state', 'pass_through', 'action', 'next_state', 'reward'))
 
 
 class NetworkRunner:
@@ -38,10 +38,8 @@ class NetworkRunner:
                            screen_size=SCREEN_SIZE, network_runner=self)
 
         # Initialize the environment and state
-        # self.last_screen = self.get_screen()
         self.current_screen = self.get_screen()
         self.blended_img = self.current_screen
-        self.last_screens = [self.current_screen, self.current_screen, self.current_screen]
 
         self.state = self.blend_screens()
         self.episode_cntr = 1
@@ -50,36 +48,18 @@ class NetworkRunner:
         self.done = False
 
         self.previous_state = self.state
-        self.previous_action = pt.tensor([[0, 0, 0, 0, 0]])
+        self.previous_action = pt.tensor([[0, 0, 0, 0]])
         self.losses = []
+        self.unit_losses = []
 
-    def blend_screens(self):
-        # image1 = tv.ToPILImage()(np.squeeze(self.current_screen))
-        # image2 = tv.ToPILImage()(np.squeeze(self.last_screens[0]))
-        # image3 = tv.ToPILImage()(np.squeeze(self.last_screens[1]))
-        # image4 = tv.ToPILImage()(np.squeeze(self.last_screens[2]))
-
-        # self.blended_img = Image.blend(image1, image2, alpha=0.05)
-        # self.blended_img = Image.blend(self.blended_img, image3, alpha=0.03)
-        # self.blended_img = Image.blend(self.blended_img, image4, alpha=0.01).convert("RGB")
-
-        self.blended_img = self.current_screen
-
-        return self.blended_img
-        # return resize(self.blended_img).unsqueeze(0).to(self.device)
+        self.pass_through = self.agent.action_processing(self.state)
 
     def run(self):
         self.reward = pt.tensor([self.receiver.reward], device=self.device)
         self.done = self.receiver.game_over
 
-        # Observe new state and update last screens
-        # self.last_screens[2] = self.last_screens[1]
-        # self.last_screens[1] = self.last_screens[0]
-        # self.last_screens[0] = self.current_screen
+        # Observe new state
         self.current_screen = self.get_screen()
-
-        # self.plot_state(self.last_screen, name="last", figure=5)
-        # self.plot_state(self.current_screen, name="current", figure=6)
 
         if not self.done:
             next_state = self.blend_screens()
@@ -87,43 +67,44 @@ class NetworkRunner:
             next_state = None
 
         # Store the transition in memory
-        self.agent.memory.push(self.state, self.receiver.action, next_state, self.reward)
+        self.agent.memory.push(self.state, self.pass_through, self.receiver.action, next_state, self.reward)
 
         # Move to the next state
         self.state = next_state
 
         # Select an action to send to the env
         if self.state is not None:
-            self.receiver.action = self.agent.select_action(self.state)
-
-        # Perform one step of the optimization (on the target network)
-        self.optimize_model()
+            self.pass_through = self.agent.action_processing(self.state)
+            self.receiver.action = self.agent.select_action(self.pass_through)
 
         if self.done:
             print("done")
+            self.optimize_model()
             self.agent.episode_durations.append(self.episode_cntr)
             self.agent.episode_scores.append(self.receiver.cumulative_reward)
             self.receiver.image = Image.open("BlackScreen_128.png")
+
             if self.receiver.game_cntr % 5 == 0:
                 self.plot_graphs()
-                # self.plot_losses()
+                self.plot_losses()
 
             self.episode_cntr = 0
             self.current_screen = self.get_screen()
-            self.last_screens = [self.current_screen, self.current_screen, self.current_screen]
             self.state = self.blend_screens()
             self.receiver.reward = 0
             self.reward = pt.tensor([0], device=self.device)
             self.done = False
             return
 
-        # Update the target network, copying all weights and biases in DQN
+        # Update the target network, copying all weights and biases in the networks
         if self.episode_cntr % TARGET_UPDATE == 0:
             self.agent.target_net.load_state_dict(self.agent.policy_net.state_dict())
+            self.agent.target_unit_net.load_state_dict(self.agent.unit_net.state_dict())
 
         self.episode_cntr += 1
 
-        # self.plot_state(self.state, name="state")
+    def blend_screens(self):
+        return self.current_screen
 
     def optimize_model(self):
         if len(self.agent.memory) < BATCH_SIZE:
@@ -134,65 +115,64 @@ class NetworkRunner:
         non_final_mask = pt.tensor(tuple(map(lambda s: s is not None,
                                              batch.next_state)), device=self.agent.device, dtype=pt.bool)
         non_final_next_states = pt.cat([s for s in batch.next_state if s is not None])
+
         state_batch = pt.cat(batch.state)
+        pass_batch = pt.cat(batch.pass_through)
         action_batch = pt.cat(batch.action)
         reward_batch = pt.cat(batch.reward)
 
-        state_action_values = self.agent.policy_net(state_batch).gather(1, action_batch)
+        state_action_values = self.agent.unit_net(state_batch).gather(1, action_batch)
+
+        pass_action_values = self.agent.policy_net(pass_batch).gather(1, action_batch)
 
         next_state_values = pt.zeros(BATCH_SIZE, device=self.agent.device)
+        pass_t_values = pt.zeros(BATCH_SIZE, device=self.agent.device)
 
-        next_state_values[non_final_mask] = self.agent.target_net(non_final_next_states).max(1)[0][0].detach()
-
-        # print("debug")
-        # print(next_state_values[non_final_mask])
+        pass_t_values[non_final_mask] = self.agent.target_unit_net(non_final_next_states).max(1)[0][0].detach()
+        next_state_values[non_final_mask] = self.agent.target_net(pass_batch).max(1)[0][0].detach()
 
         expected_state_action_values = (next_state_values * GAMMA) + reward_batch
+        expected_pass_action_values = (pass_t_values * GAMMA) + reward_batch
 
-        loss = ptnnf.smooth_l1_loss(state_action_values, expected_state_action_values.unsqueeze(1))
+        loss = ptnnf.smooth_l1_loss(pass_action_values, expected_pass_action_values.unsqueeze(1))
         self.agent.optimizer.zero_grad()
 
         loss.backward()
 
-        # print("loss")
-        # print(loss)
         self.losses.append(loss)
+
+        unit_loss = ptnnf.smooth_l1_loss(state_action_values, expected_state_action_values.unsqueeze(1))
+        self.agent.unit_optimizer.zero_grad()
+
+        unit_loss.backward()
+
+        self.unit_losses.append(unit_loss)
 
         for param in self.agent.policy_net.parameters():
             param.grad.data.clamp_(-1, 1)
         self.agent.optimizer.step()
 
+        for param in self.agent.unit_net.parameters():
+            param.grad.data.clamp_(-1, 1)
+        self.agent.unit_optimizer.step()
+
     def get_screen(self):
         x = []
 
-        # think about a for loop? not super needed but would be useful
-
         screen = self.receiver.images[0]
         x.append(resize(screen))
-
         screen = self.receiver.images[1]
         x.append(resize(screen))
-
         screen = self.receiver.images[2]
         x.append(resize(screen))
-
         screen = self.receiver.images[3]
         x.append(resize(screen))
 
-        screen = self.receiver.images[4]
-        x.append(resize(screen))
+        # x = pt.stack(x)
 
-        # self.plot_state(x[0], name="current 1", figure=6)
-        # self.plot_state(x[1], name="current 2", figure=7)
-        # self.plot_state(x[2], name="current 3", figure=8)
-        # self.plot_state(x[3], name="current 4", figure=9)
-        self.plot_state(x[4], name="current 5", figure=10)
-
-        x = pt.stack(x)
-        # print(x.shape)
         return x
 
-    def plot_state(self, state, figure=4, name="state"):
+    def plot_state(self, state, figure=5, name="state"):
         plt.figure(figure)
         plt.clf()
         plt.imshow(state.cpu().squeeze(0).permute(1, 2, 0).numpy(), interpolation='none')
@@ -210,9 +190,25 @@ class NetworkRunner:
 
         plt.figure(3)
         plt.clf()
-        plt.title('Training...')
-        plt.xlabel('Episode')
-        plt.ylabel('loss')
+        plt.title('Fully Connected Loss')
+        plt.xlabel('Steps')
+        plt.ylabel('Loss')
+        plt.plot(losses_t.numpy())
+
+        plt.pause(0.001)  # pause a bit so that plots are updated
+        if self.is_ipython:
+            display.clear_output(wait=True)
+            display.display(plt.gcf())
+
+        losses_t = pt.tensor(self.unit_losses, dtype=pt.float)
+        if len(losses_t) < 1:
+            return
+
+        plt.figure(4)
+        plt.clf()
+        plt.title('Convolutional NN Loss')
+        plt.xlabel('Steps')
+        plt.ylabel('Loss')
         plt.plot(losses_t.numpy())
 
         plt.pause(0.001)  # pause a bit so that plots are updated

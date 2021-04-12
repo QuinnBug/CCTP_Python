@@ -7,7 +7,7 @@ import torch.optim as pto
 from collections import namedtuple
 
 Transition = namedtuple('Transition',
-                        ('state', 'pass_through', 'action', 'next_state', 'reward'))
+                        ('state', 'pass_through', 'action', 'next_pass', 'next_state', 'reward'))
 
 STRIDE = 1
 KERNEL = 5
@@ -95,8 +95,9 @@ class Agent:
         self.screen_size = screen_size
 
         self.nr = network_runner
-        init_screen = self.nr.get_screen()
-        _, _, screen_height, screen_width = init_screen.shape
+        # init_screen = self.nr.get_screen()
+        # _, _, screen_height, screen_width = init_screen.shape
+        screen_height = screen_width = 64
 
         self.unit_net = [UnitNN(screen_height, screen_width, self.n_actions).to(device),
                          UnitNN(screen_height, screen_width, self.n_actions).to(device),
@@ -112,7 +113,9 @@ class Agent:
         self.target_net = DQN(self.n_actions, self.n_actions).to(device)
 
         self.optimizer = pto.RMSprop(self.policy_net.parameters())
-        self.unit_optimizer = pto.RMSprop(self.unit_net.parameters())
+        self.unit_optimizer = [pto.RMSprop(self.unit_net[0].parameters()), pto.RMSprop(self.unit_net[1].parameters()),
+                               pto.RMSprop(self.unit_net[2].parameters()), pto.RMSprop(self.unit_net[3].parameters())]
+
         self.memory = ReplayMemory(10000)
 
         self.episode_durations = []
@@ -158,19 +161,16 @@ class Agent:
         if self.nr.receiver.game_cntr % 100 == 0:
             sample += 1
 
-        # sample += 1
+        sample += 1
 
         if sample > eps_threshold:
             print("best action ap")
             with pt.no_grad():
                 outputs = [self.unit_net[0](state[0]), self.unit_net[1](state[1]), self.unit_net[2](state[2]),
                            self.unit_net[3](state[3])]
-
-                outputs = pt.stack(outputs)
         else:
             print("random action ap")
-            outputs = pt.rand(4, 4)
-            outputs.float()
+            outputs = pt.rand()
 
         return outputs
 

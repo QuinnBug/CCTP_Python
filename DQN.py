@@ -37,25 +37,25 @@ class ReplayMemory(object):
 class DQN(ptnn.Module):
     def __init__(self, h, w, outputs):
         super(DQN, self).__init__()
-        self.conv1 = ptnn.Conv2d(3, 8, kernel_size=KERNEL, stride=STRIDE)
-        self.bn1 = ptnn.BatchNorm2d(8)
-        self.conv2 = ptnn.Conv2d(8, 16, kernel_size=KERNEL, stride=STRIDE)
-        self.bn2 = ptnn.BatchNorm2d(16)
-        self.conv3 = ptnn.Conv2d(16, 32, kernel_size=KERNEL, stride=STRIDE)
-        self.bn3 = ptnn.BatchNorm2d(32)
+        self.conv1 = ptnn.Conv2d(3, 6, kernel_size=KERNEL, stride=STRIDE)
+        self.bn1 = ptnn.BatchNorm2d(6)
+        self.conv2 = ptnn.Conv2d(6, 12, kernel_size=KERNEL, stride=STRIDE)
+        self.bn2 = ptnn.BatchNorm2d(12)
+        self.conv3 = ptnn.Conv2d(12, 12, kernel_size=KERNEL, stride=STRIDE)
+        self.bn3 = ptnn.BatchNorm2d(12)
 
         def conv2d_size_out(size, kernel_size=KERNEL, stride=STRIDE):
             return (size - (kernel_size - 1) - 1) // stride + 1
 
         convw = conv2d_size_out(conv2d_size_out(conv2d_size_out(w)))
         convh = conv2d_size_out(conv2d_size_out(conv2d_size_out(h)))
-        linear_input_size = convw * convh * 32
+        linear_input_size = convw * convh * 12
         # print("debug DQN messages")
         # print(convh)
         # print(convw)
         # print(linear_input_size)
-        self.fc1 = ptnn.Linear(linear_input_size, 32)
-        self.fc2 = ptnn.Linear(32, outputs)
+        self.fc1 = ptnn.Linear(linear_input_size, 24)
+        self.fc2 = ptnn.Linear(24, outputs)
 
     def forward(self, x):
         x = ptnnf.relu(self.bn1(self.conv1(x)))
@@ -138,11 +138,11 @@ class Agent:
         if sample > eps_threshold:
             # print("best action")
             with pt.no_grad():
-                x = self.policy_net(state).max(1)[1].view(1, 5)
+                x = self.policy_net(state).max(1)[1].view(1, 4)
+                # x = pt.tensor((x[0], x[1], x[2], x[3]))
                 return x
         else:
             # print("random action")
             return pt.tensor([[random.randrange(self.n_actions), random.randrange(self.n_actions),
-                               random.randrange(self.n_actions), random.randrange(self.n_actions),
-                               random.randrange(self.n_actions)]],
+                              random.randrange(self.n_actions), random.randrange(self.n_actions)]],
                              device=self.device, dtype=pt.long)

@@ -50,7 +50,7 @@ class NetworkRunner:
         self.done = False
 
         self.previous_state = self.state
-        self.previous_action = pt.tensor([[0, 0, 0, 0, 0]])
+        self.previous_action = pt.tensor([[0, 0, 0, 0]])
         self.losses = []
 
     def blend_screens(self):
@@ -179,14 +179,14 @@ class NetworkRunner:
         screen = self.receiver.images[3]
         x.append(resize(screen))
 
-        screen = self.receiver.images[4]
-        x.append(resize(screen))
+        # screen = self.receiver.images[4]
+        # x.append(resize(screen))
 
         # self.plot_state(x[0], name="current 1", figure=6)
         # self.plot_state(x[1], name="current 2", figure=7)
         # self.plot_state(x[2], name="current 3", figure=8)
         # self.plot_state(x[3], name="current 4", figure=9)
-        self.plot_state(x[4], name="current 5", figure=10)
+        # self.plot_state(x[4], name="current 5", figure=10)
 
         x = pt.stack(x)
         # print(x.shape)

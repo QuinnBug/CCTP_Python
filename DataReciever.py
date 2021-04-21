@@ -26,7 +26,7 @@ class ImageReceiver:
         self.image = Image.open("BlackScreen_128.png")
         self.images = [self.image, self.image, self.image, self.image, self.image]
         self.networkRunner = NetworkRunner(self)
-        self.action = pt.tensor([[0, 0, 0, 0]])
+        self.action = pt.tensor([0])
 
         # comment out the next line to start a new model with the model path file name
         # self.networkRunner.agent.load_models(MODEL_PATH)
@@ -63,7 +63,7 @@ class ImageReceiver:
                             img_data[1] = b'\x89PNG' + img_data[2]
                             img_data[2] = b'\x89PNG' + img_data[3]
                             img_data[3] = b'\x89PNG' + img_data[4]
-                            # img_data[4] = b'\x89PNG' + img_data[5]
+                            img_data[4] = b'\x89PNG' + img_data[5]
 
                             # self.data = data[3:]
                             self.cumulative_reward += self.reward
@@ -74,7 +74,7 @@ class ImageReceiver:
                                 self.images[1] = Image.open(io.BytesIO(img_data[1]))
                                 self.images[2] = Image.open(io.BytesIO(img_data[2]))
                                 self.images[3] = Image.open(io.BytesIO(img_data[3]))
-                                # self.images[4] = Image.open(io.BytesIO(img_data[4]))
+                                self.images[4] = Image.open(io.BytesIO(img_data[4]))
 
                                 self.networkRunner.run()
 

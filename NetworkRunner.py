@@ -1,3 +1,5 @@
+import numpy
+
 from DQN import Agent
 import torch as pt
 import torch.nn.functional as ptnnf
@@ -10,10 +12,10 @@ import numpy as np
 
 # import queue
 
-BATCH_SIZE = 128
+BATCH_SIZE = 10
 GAMMA = 0.999
 EPS_START = 0.9
-EPS_END = 0.005
+EPS_END = 0.05
 EPS_DECAY = 500
 TARGET_UPDATE = 25
 SCREEN_SIZE = 64
@@ -23,7 +25,10 @@ resize = tv.Compose([tv.Resize(SCREEN_SIZE, interpolation=Image.CUBIC),
                      tv.ToTensor()])
 
 Transition = namedtuple('Transition',
-                        ('state', 'pass_through', 'action', 'next_pass', 'next_state', 'reward'))
+                        ('state', 'pass_through', 'action', 'next_pass', 'next_state', 'reward', 'position'))
+
+Overview = namedtuple('Overview',
+                      ('image', 'processed_actions'))
 
 
 class NetworkRunner:
@@ -38,21 +43,22 @@ class NetworkRunner:
                            screen_size=SCREEN_SIZE, network_runner=self)
 
         # Initialize the environment and state
+        self.ov_screen = self.receiver.images[4]
         self.current_screen = self.get_screen()
-        self.blended_img = self.current_screen
 
-        self.state = self.blend_screens()
+        self.state = self.current_screen
         self.episode_cntr = 1
 
         self.reward = pt.tensor([0], device=self.device)
         self.done = False
 
         self.previous_state = self.state
-        self.previous_action = pt.tensor([[0, 0, 0, 0]])
+        self.previous_action = pt.tensor([0])
         self.losses = []
         self.unit_losses = [[], [], [], []]
 
-        self.pass_through = self.agent.action_processing(self.state)
+        self.pass_through = Overview(processed_actions=pt.stack(self.agent.action_processing(self.state)),
+                                     image=self.ov_screen)
 
     def run(self):
         self.reward = pt.tensor([self.receiver.reward], device=self.device)
@@ -62,11 +68,12 @@ class NetworkRunner:
         self.current_screen = self.get_screen()
 
         if not self.done:
-            next_state = self.blend_screens()
-            next_pass = self.agent.action_processing(next_state)
+            next_state = self.current_screen
+            next_pass = Overview(processed_actions=pt.stack(self.agent.action_processing(next_state)),
+                                 image=self.ov_screen)
         else:
             next_state = [None, None, None, None]
-            next_pass = [None, None, None, None]
+            next_pass = Overview(processed_actions=[None, None, None, None], image=None)
 
         # Store the transition in memory
         self.agent.memory.push(self.state, self.pass_through, self.receiver.action, next_pass, next_state, self.reward)
@@ -76,24 +83,23 @@ class NetworkRunner:
         self.pass_through = next_pass
 
         # Select an action to send to the env
-        if self.state is not None:
-            if self.pass_through[0] is not None:
-                self.receiver.action = self.agent.select_action(pt.stack(self.pass_through))
-
-        if self.done:
+        if not self.done:
+            self.receiver.action = self.agent.select_action(self.pass_through)
+        else:
             print("done")
             self.optimize_model()
             self.agent.episode_durations.append(self.episode_cntr)
             self.agent.episode_scores.append(self.receiver.cumulative_reward)
             self.receiver.image = Image.open("BlackScreen_128.png")
 
-            if self.receiver.game_cntr % 5 == 0:
+            if self.receiver.game_cntr % 10 == 0:
                 self.plot_graphs()
                 self.plot_losses()
 
             self.episode_cntr = 0
             self.current_screen = self.get_screen()
-            self.state = self.blend_screens()
+            self.state = self.current_screen
+            self.pass_through.image = self.state
             self.receiver.reward = 0
             self.reward = pt.tensor([0], device=self.device)
             self.done = False
@@ -107,9 +113,6 @@ class NetworkRunner:
 
         self.episode_cntr += 1
 
-    def blend_screens(self):
-        return self.current_screen
-
     def optimize_model(self):
         if len(self.agent.memory) < BATCH_SIZE:
             return
@@ -120,28 +123,25 @@ class NetworkRunner:
                                              batch.next_state)), device=self.agent.device, dtype=pt.bool)
 
         x = []
-        for t_list in batch.next_pass:
-            if t_list[0] is not None:
-                t_list = pt.stack(t_list)
-                x.append(t_list)
-        x = pt.cat(x)
+        y = []
+        for i in range(BATCH_SIZE):
+            if batch.next_pass[i].image is not None:
+                x.append(batch.position[i])
+                y.append(batch.position[i])
 
-        non_final_next_passes = x
+        non_final_next_passes = pt.cat([pt.ones(1), pt.tensor(x)])
 
-        x = []
-        for t_list in batch.pass_through:
-            if t_list[0] is not None:
-                t_list = pt.stack(t_list)
-                x.append(t_list)
-        x = pt.cat(x)
-
-        pass_batch = x
-
+        pass_batch = pt.cat([pt.zeros(1), pt.tensor(x)])
         action_batch = pt.cat(batch.action)
-
         reward_batch = pt.cat(batch.reward)
 
-        pass_action_values = self.agent.policy_net(pass_batch).gather(1, action_batch)
+        print("batches")
+        print(pass_batch)
+        print(non_final_next_passes)
+        print(action_batch.shape)
+        print(self.agent.policy_net(pass_batch).shape)
+
+        pass_action_values = self.agent.policy_net(pass_batch).gather(0, action_batch)
         next_pass_values = pt.zeros(BATCH_SIZE, device=self.agent.device)
         next_pass_values[non_final_mask] = self.agent.target_net(non_final_next_passes).max(1)[0][0].detach()
         expected_pass_action_values = (next_pass_values * GAMMA) + reward_batch
@@ -188,10 +188,10 @@ class NetworkRunner:
 
             x = []
             for t_list in batch.pass_through:
-                if t_list[0] is not None:
+                if t_list.processed_actions[0] is not None:
                     x.append(t_list[i])
                 else:
-                    x.append(pt.zeros(1, 4))
+                    x.append(Overview(processed_actions=pt.zeros(1, 4), image=None))
             x = pt.stack(x)
 
             pass_batch = x.max(1)[1].detach()
@@ -225,6 +225,9 @@ class NetworkRunner:
         x.append(resize(screen).unsqueeze(0))
         screen = self.receiver.images[3]
         x.append(resize(screen).unsqueeze(0))
+
+        screen = self.receiver.images[4]
+        self.ov_screen = resize(screen).unsqueeze(0)
 
         return x
 

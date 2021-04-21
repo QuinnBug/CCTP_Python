@@ -6,8 +6,13 @@ import torch.nn.functional as ptnnf
 import torch.optim as pto
 from collections import namedtuple
 
+import NetworkRunner
+
 Transition = namedtuple('Transition',
-                        ('state', 'pass_through', 'action', 'next_pass', 'next_state', 'reward'))
+                        ('state', 'pass_through', 'action', 'next_pass', 'next_state', 'reward', 'position'))
+
+Overview = namedtuple('Overview',
+                      ('image', 'processed_actions'))
 
 STRIDE = 1
 KERNEL = 5
@@ -24,7 +29,7 @@ class ReplayMemory(object):
     def push(self, *args):
         if len(self.memory) < self.capacity:
             self.memory.append(None)
-        self.memory[self.position] = Transition(*args)
+        self.memory[self.position] = Transition(*args, position=self.position)
         self.position = (self.position + 1) % self.capacity
 
     def sample(self, batch_size):
@@ -35,18 +40,63 @@ class ReplayMemory(object):
 
 
 class DQN(ptnn.Module):
-    def __init__(self, inputs, outputs):
+    def __init__(self, inputs, outputs, h, w, agent):
         super(DQN, self).__init__()
 
-        self.fc1 = ptnn.Linear(inputs, 64)
-        self.fc2 = ptnn.Linear(64, 32)
-        self.fc3 = ptnn.Linear(32, outputs)
+        self.conv1 = ptnn.Conv2d(3, 8, kernel_size=KERNEL, stride=STRIDE)
+        self.bn1 = ptnn.BatchNorm2d(8)
+        self.conv2 = ptnn.Conv2d(8, 16, kernel_size=KERNEL, stride=STRIDE)
+        self.bn2 = ptnn.BatchNorm2d(16)
+
+        def conv2d_size_out(size, kernel_size=KERNEL, stride=STRIDE):
+            return (size - (kernel_size - 1) - 1) // stride + 1
+
+        convw = conv2d_size_out(conv2d_size_out(w))
+        convh = conv2d_size_out(conv2d_size_out(h))
+        linear_input_size = convw * convh * 16
+
+        self.fc1 = ptnn.Linear(linear_input_size, 64)
+        self.fc2 = ptnn.Linear(64 + inputs, 48)
+        self.fc3 = ptnn.Linear(48, outputs)
+
+        self.agent = agent
 
     def forward(self, x):
-        # print("forward")
-        # print(x)
+        if type(x) is pt.Tensor:
+            img = []
+            tens = []
 
+            pointer = x[0]
+            if pointer is 0:
+                for i in range(len(x) - 1):
+                    img.append(self.agent.memory.memory[int(x[i + 1])].pass_through.image)
+                    tens.append(self.agent.memory.memory[int(x[i + 1])].pass_through.processed_actions)
+            else:
+                for i in range(len(x) - 1):
+                    img.append(self.agent.memory.memory[int(x[i + 1])].next_pass.image)
+                    tens.append(self.agent.memory.memory[int(x[i + 1])].next_pass.processed_actions)
+
+            img = pt.stack(img)
+            img = img.squeeze(1)
+
+            tens = pt.stack(tens)
+            tens = tens.squeeze(1)
+
+            # print("shapes")
+            # print(img.shape)
+            # print(tens.shape)
+        else:
+            img = x.image
+            tens = x.processed_actions
+
+        x = ptnnf.relu(self.bn1(self.conv1(img)))
+        x = ptnnf.relu(self.bn2(self.conv2(x)))
         x = ptnnf.relu(self.fc1(x.view(x.size(0), -1)))
+
+        tens = tens.view(x.size(0), -1)
+
+        x = pt.cat([x, tens], dim=1)
+
         x = ptnnf.relu(self.fc2(x.view(x.size(0), -1)))
         x = self.fc3(x.view(x.size(0), -1))
 
@@ -109,14 +159,14 @@ class Agent:
                                 UnitNN(screen_height, screen_width, self.n_actions).to(device),
                                 UnitNN(screen_height, screen_width, self.n_actions).to(device)]
 
-        self.policy_net = DQN(self.n_actions, self.n_actions).to(device)
-        self.target_net = DQN(self.n_actions, self.n_actions).to(device)
+        self.policy_net = DQN(self.n_actions*4, self.n_actions*4, screen_height, screen_width, self).to(device)
+        self.target_net = DQN(self.n_actions*4, self.n_actions*4, screen_height, screen_width, self).to(device)
 
         self.optimizer = pto.RMSprop(self.policy_net.parameters())
         self.unit_optimizer = [pto.RMSprop(self.unit_net[0].parameters()), pto.RMSprop(self.unit_net[1].parameters()),
                                pto.RMSprop(self.unit_net[2].parameters()), pto.RMSprop(self.unit_net[3].parameters())]
 
-        self.memory = ReplayMemory(10000)
+        self.memory = ReplayMemory(1000000)
 
         self.episode_durations = []
         self.episode_scores = []
@@ -166,12 +216,15 @@ class Agent:
         if sample > eps_threshold:
             print("best action ap")
             with pt.no_grad():
-                outputs = [self.unit_net[0](state[0]), self.unit_net[1](state[1]), self.unit_net[2](state[2]),
+                outputs = [self.unit_net[0](state[0]),
+                           self.unit_net[1](state[1]),
+                           self.unit_net[2](state[2]),
                            self.unit_net[3](state[3])]
         else:
-            print("random action ap")
+            # print("random action ap")
             outputs = pt.rand()
 
+        print(outputs)
         return outputs
 
     def select_action(self, state):
@@ -187,10 +240,10 @@ class Agent:
         if sample > eps_threshold:
             print("best action sa")
             with pt.no_grad():
-                x = self.policy_net(state).max(1)[1].view(1, 4)
+                print("max")
+                x = self.policy_net(state).max(1)[1]
                 return x
         else:
             print("random action sa")
-            return pt.tensor([[random.randrange(self.n_actions), random.randrange(self.n_actions),
-                               random.randrange(self.n_actions), random.randrange(self.n_actions)]],
+            return pt.tensor([random.randrange(self.n_actions * 4)],
                              device=self.device, dtype=pt.long)

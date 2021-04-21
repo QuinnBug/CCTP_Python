@@ -136,8 +136,7 @@ class NetworkRunner:
         reward_batch = pt.cat(batch.reward)
 
         print("batches")
-        print(pass_batch)
-        print(non_final_next_passes)
+        print(pass_batch.shape)
         print(action_batch.shape)
         print(self.agent.policy_net(pass_batch).shape)
 

@@ -81,13 +81,15 @@ class DQN(ptnn.Module):
 
             tens = pt.stack(tens)
             tens = tens.squeeze(1)
+            print("shapes _ multi image")
 
-            # print("shapes")
-            # print(img.shape)
-            # print(tens.shape)
         else:
+            print("shapes _ single image")
             img = x.image
             tens = x.processed_actions
+
+        print(img.shape)
+        print(tens.shape)
 
         x = ptnnf.relu(self.bn1(self.conv1(img)))
         x = ptnnf.relu(self.bn2(self.conv2(x)))
@@ -235,7 +237,7 @@ class Agent:
         if self.nr.receiver.game_cntr % 100 == 0:
             sample += 1
 
-        # sample += 1
+        sample += 1
 
         if sample > eps_threshold:
             print("best action sa")

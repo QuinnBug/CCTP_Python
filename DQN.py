@@ -76,20 +76,18 @@ class DQN(ptnn.Module):
                     img.append(self.agent.memory.memory[int(x[i + 1])].next_pass.image)
                     tens.append(self.agent.memory.memory[int(x[i + 1])].next_pass.processed_actions)
 
-            img = pt.stack(img)
-            img = img.squeeze(1)
+            img = pt.cat(img)
 
-            tens = pt.stack(tens)
-            tens = tens.squeeze(1)
-            print("shapes _ multi image")
+            tens = pt.cat(tens)
+            # print("shapes _ multi image")
 
         else:
-            print("shapes _ single image")
+            # print("shapes _ single image")
             img = x.image
             tens = x.processed_actions
 
-        print(img.shape)
-        print(tens.shape)
+        # print(img.shape)
+        # print(tens.shape)
 
         x = ptnnf.relu(self.bn1(self.conv1(img)))
         x = ptnnf.relu(self.bn2(self.conv2(x)))
@@ -123,13 +121,15 @@ class UnitNN(ptnn.Module):
         convw = conv2d_size_out(conv2d_size_out(conv2d_size_out(w)))
         convh = conv2d_size_out(conv2d_size_out(conv2d_size_out(h)))
         linear_input_size = convw * convh * 32
-        self.fc1 = ptnn.Linear(linear_input_size, outputs)
+        self.fc1 = ptnn.Linear(linear_input_size, 32)
+        self.fc2 = ptnn.Linear(32, outputs)
 
     def forward(self, x):
         x = ptnnf.relu(self.bn1(self.conv1(x)))
         x = ptnnf.relu(self.bn2(self.conv2(x)))
         x = ptnnf.relu(self.bn3(self.conv3(x)))
-        x = self.fc1(x.view(x.size(0), -1))
+        x = ptnnf.relu(self.fc1(x.view(x.size(0), -1)))
+        x = self.fc2(x.view(x.size(0), -1))
 
         return x
 
@@ -237,7 +237,7 @@ class Agent:
         if self.nr.receiver.game_cntr % 100 == 0:
             sample += 1
 
-        sample += 1
+        # sample += 1
 
         if sample > eps_threshold:
             print("best action sa")

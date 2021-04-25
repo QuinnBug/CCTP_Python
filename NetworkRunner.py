@@ -12,11 +12,11 @@ import numpy as np
 
 # import queue
 
-BATCH_SIZE = 10
+BATCH_SIZE = 128
 GAMMA = 0.999
 EPS_START = 0.9
 EPS_END = 0.05
-EPS_DECAY = 500
+EPS_DECAY = 1000
 TARGET_UPDATE = 25
 SCREEN_SIZE = 64
 ACTION_COUNT = 4
@@ -73,7 +73,7 @@ class NetworkRunner:
                                  image=self.ov_screen)
         else:
             next_state = [None, None, None, None]
-            next_pass = Overview(processed_actions=[None, None, None, None], image=None)
+            next_pass = Overview(processed_actions=pt.zeros(4, 1, 4), image=self.ov_screen)
 
         # Store the transition in memory
         self.agent.memory.push(self.state, self.pass_through, self.receiver.action, next_pass, next_state, self.reward)
@@ -99,7 +99,7 @@ class NetworkRunner:
             self.episode_cntr = 0
             self.current_screen = self.get_screen()
             self.state = self.current_screen
-            self.pass_through.image = self.state
+            self.pass_through = Overview(processed_actions=pt.zeros(4, 1, 4), image=self.ov_screen)
             self.receiver.reward = 0
             self.reward = pt.tensor([0], device=self.device)
             self.done = False
@@ -125,22 +125,26 @@ class NetworkRunner:
         x = []
         y = []
         for i in range(BATCH_SIZE):
-            if batch.next_pass[i].image is not None:
+            y.append(batch.position[i])
+            if batch.next_pass[i].processed_actions[0] is not None:
                 x.append(batch.position[i])
-                y.append(batch.position[i])
 
-        non_final_next_passes = pt.cat([pt.ones(1), pt.tensor(x)])
+        non_final_next_passes = pt.cat([pt.ones(1), pt.tensor(x)]).unsqueeze(1)
+        pass_batch = pt.cat([pt.zeros(1), pt.tensor(y)]).unsqueeze(1)
 
-        pass_batch = pt.cat([pt.zeros(1), pt.tensor(x)])
-        action_batch = pt.cat(batch.action)
+        # action_batch = pt.cat([pt.zeros(1), pt.cat(batch.action)]).unsqueeze(1)
+        action_batch = pt.cat(batch.action).unsqueeze(1)
         reward_batch = pt.cat(batch.reward)
 
-        print("batches")
-        print(pass_batch.shape)
-        print(action_batch.shape)
-        print(self.agent.policy_net(pass_batch).shape)
+        action_batch = action_batch.to(pt.int64)
 
-        pass_action_values = self.agent.policy_net(pass_batch).gather(0, action_batch)
+        # print("batches")
+        # print(action_batch)
+        # print(pass_batch.shape)
+        # print(non_final_next_passes.shape)
+        # print(self.agent.policy_net(pass_batch).shape)
+
+        pass_action_values = self.agent.policy_net(pass_batch).gather(1, action_batch)
         next_pass_values = pt.zeros(BATCH_SIZE, device=self.agent.device)
         next_pass_values[non_final_mask] = self.agent.target_net(non_final_next_passes).max(1)[0][0].detach()
         expected_pass_action_values = (next_pass_values * GAMMA) + reward_batch
@@ -185,22 +189,28 @@ class NetworkRunner:
                     x.append(pt.zeros(1, 3, 64, 64))
             state_batch = pt.cat(x)
 
-            x = []
-            for t_list in batch.pass_through:
-                if t_list.processed_actions[0] is not None:
-                    x.append(t_list[i])
-                else:
-                    x.append(Overview(processed_actions=pt.zeros(1, 4), image=None))
-            x = pt.stack(x)
+            y = []
+            for j in range(BATCH_SIZE):
+                y.append(batch.pass_through[j].processed_actions.max(0)[1].detach())
 
-            pass_batch = x.max(1)[1].detach()
+            pass_batch = pt.cat(y)
 
+            # action_batch = pt.cat(batch.action).unsqueeze(1)
             reward_batch = pt.cat(batch.reward)
+
+            # print("batches")
+            # print(pass_batch)
+            # print(pass_batch.shape)
+            # print(state_batch.shape)
+            # print(self.agent.unit_net[i](state_batch).shape)
 
             state_pass_values = self.agent.unit_net[i](state_batch).gather(1, pass_batch)
             next_state_values = pt.zeros(BATCH_SIZE, device=self.agent.device)
             next_state_values[non_final_mask] = self.agent.target_unit_net[i](non_final_next_states).max(1)[0].detach()
             expected_state_pass_values = (next_state_values * GAMMA) + reward_batch
+
+            # print(state_pass_values.shape)
+            # print(expected_state_pass_values.shape)
 
             unit_loss = ptnnf.smooth_l1_loss(state_pass_values, expected_state_pass_values.unsqueeze(1))
             self.agent.unit_optimizer[i].zero_grad()

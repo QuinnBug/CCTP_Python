@@ -1,4 +1,6 @@
 import socket as skt
+
+import numpy
 import torch as pt
 from NetworkRunner import NetworkRunner
 from PIL import Image
@@ -19,6 +21,7 @@ class ImageReceiver:
         self.connected = False
         self.game_over = False
         self.reward = 0
+        self.rewards = [0, 0, 0, 0]
         self.cumulative_reward = 0
         self.game_cntr = 0
         self.highest_score = -999
@@ -26,7 +29,7 @@ class ImageReceiver:
         self.image = Image.open("BlackScreen_128.png")
         self.images = [self.image, self.image, self.image, self.image, self.image]
         self.networkRunner = NetworkRunner(self)
-        self.action = pt.tensor([0])
+        self.action = pt.tensor([[0, 0, 0, 0]])
 
         # comment out the next line to start a new model with the model path file name
         # self.networkRunner.agent.load_models(MODEL_PATH)
@@ -56,9 +59,19 @@ class ImageReceiver:
                             self.active = False
                         else:
                             self.game_over = True if int(data[0]) == 1 else False
-                            self.reward = int(data[2]) if int(data[1]) == 0 else int(data[2]) * -1
 
-                            img_data = data[3:].split(b'\x89PNG')
+                            self.rewards[0] = int(data[2]) if int(data[1]) == 0 else int(data[2]) * -1
+                            self.rewards[1] = int(data[4]) if int(data[3]) == 0 else int(data[4]) * -1
+                            self.rewards[2] = int(data[6]) if int(data[5]) == 0 else int(data[6]) * -1
+                            self.rewards[3] = int(data[8]) if int(data[7]) == 0 else int(data[8]) * -1
+                            self.reward = self.rewards[0] + self.rewards[1] + self.rewards[2] + self.rewards[3]
+
+                            # for i in range(len(self.rewards)):
+                            #     print(self.rewards[i])
+
+                            # print(self.reward)
+
+                            img_data = data[9:].split(b'\x89PNG')
                             img_data[0] = b'\x89PNG' + img_data[1]
                             img_data[1] = b'\x89PNG' + img_data[2]
                             img_data[2] = b'\x89PNG' + img_data[3]
@@ -68,7 +81,7 @@ class ImageReceiver:
                             # self.data = data[3:]
                             self.cumulative_reward += self.reward
 
-                            if data[3] == 0x89:
+                            if data[9] == 0x89:
                                 # self.image = Image.open(io.BytesIO(self.data))
                                 self.images[0] = Image.open(io.BytesIO(img_data[0]))
                                 self.images[1] = Image.open(io.BytesIO(img_data[1]))
@@ -78,7 +91,7 @@ class ImageReceiver:
 
                                 self.networkRunner.run()
 
-                                print(self.action)
+                                # print(self.action)
 
                                 ba = self.action.numpy().tobytes()
                                 conn.sendall(ba)

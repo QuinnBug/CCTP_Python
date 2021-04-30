@@ -9,10 +9,11 @@ from collections import namedtuple
 import NetworkRunner
 
 Transition = namedtuple('Transition',
-                        ('state', 'pass_through', 'action', 'next_pass', 'next_state', 'reward', 'position'))
+                        ('state', 'pass_through', 'action', 'next_pass',
+                         'next_state', 'reward', 'position'))
 
 Overview = namedtuple('Overview',
-                      ('image', 'processed_actions'))
+                      ('image', 'processed_actions', 'reward'))
 
 STRIDE = 1
 KERNEL = 5
@@ -100,7 +101,7 @@ class DQN(ptnn.Module):
         x = ptnnf.relu(self.fc2(x.view(x.size(0), -1)))
         x = self.fc3(x.view(x.size(0), -1))
 
-        # print(x)
+        x = x.reshape(x.shape[0], 4, 4)
 
         return x
 
@@ -147,9 +148,8 @@ class Agent:
         self.screen_size = screen_size
 
         self.nr = network_runner
-        # init_screen = self.nr.get_screen()
-        # _, _, screen_height, screen_width = init_screen.shape
-        screen_height = screen_width = 64
+        init_screen = self.nr.get_screen()[0]
+        _, _, screen_height, screen_width = init_screen.shape
 
         self.unit_net = [UnitNN(screen_height, screen_width, self.n_actions).to(device),
                          UnitNN(screen_height, screen_width, self.n_actions).to(device),
@@ -207,26 +207,37 @@ class Agent:
         self.target_net.eval()
 
     def action_processing(self, state):
-        sample = random.random()
-        eps_threshold = self.eps_min + (self.eps_start - self.eps_min) * math.exp(-1. * self.steps_done / self.eps_dec)
+        with pt.no_grad():
+            outputs = [self.unit_net[0](state[0]),
+                       self.unit_net[1](state[1]),
+                       self.unit_net[2](state[2]),
+                       self.unit_net[3](state[3])]
 
-        if self.nr.receiver.game_cntr % 100 == 0:
-            sample += 1
-
-        sample += 1
-
-        if sample > eps_threshold:
-            print("best action ap")
-            with pt.no_grad():
-                outputs = [self.unit_net[0](state[0]),
-                           self.unit_net[1](state[1]),
-                           self.unit_net[2](state[2]),
-                           self.unit_net[3](state[3])]
-        else:
-            # print("random action ap")
-            outputs = pt.rand()
-
-        print(outputs)
+        # sample = random.random()
+        # eps_threshold =
+        # self.eps_min + (self.eps_start - self.eps_min) * math.exp(-1. * self.steps_done / self.eps_dec)
+        #
+        # if self.nr.receiver.game_cntr % 100 == 0:
+        #     sample += 1
+        #
+        # sample += 1
+        #
+        # if sample > eps_threshold:
+        #     print("best action ap")
+        #
+        # else:
+        #     print("random action ap")
+        #
+        #     cap = 5
+        #
+        #     outputs = [pt.tensor(((random.randrange(-cap, cap)), (random.randrange(-cap, cap)),
+        #                          (random.randrange(-cap, cap)), (random.randrange(-cap, cap)))).unsqueeze(0),
+        #                pt.tensor(((random.randrange(-cap, cap)), (random.randrange(-cap, cap)),
+        #                           (random.randrange(-cap, cap)), (random.randrange(-cap, cap)))).unsqueeze(0),
+        #                pt.tensor(((random.randrange(-cap, cap)), (random.randrange(-cap, cap)),
+        #                           (random.randrange(-cap, cap)), (random.randrange(-cap, cap)))).unsqueeze(0),
+        #                pt.tensor(((random.randrange(-cap, cap)), (random.randrange(-cap, cap)),
+        #                           (random.randrange(-cap, cap)), (random.randrange(-cap, cap)))).unsqueeze(0)]
         return outputs
 
     def select_action(self, state):
@@ -240,12 +251,15 @@ class Agent:
         # sample += 1
 
         if sample > eps_threshold:
-            print("best action sa")
+            # print("best action sa")
             with pt.no_grad():
-                print("max")
-                x = self.policy_net(state).max(1)[1]
-                return x
+                x = self.policy_net(state)
+
+                return x.max(1)[1]
         else:
-            print("random action sa")
-            return pt.tensor([random.randrange(self.n_actions * 4)],
+            # print("random action sa")
+            return pt.tensor([[random.randrange(self.n_actions),
+                              random.randrange(self.n_actions),
+                              random.randrange(self.n_actions),
+                              random.randrange(self.n_actions)]],
                              device=self.device, dtype=pt.long)

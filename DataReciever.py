@@ -29,7 +29,7 @@ class ImageReceiver:
         self.image = Image.open("BlackScreen_128.png")
         self.images = [self.image, self.image, self.image, self.image, self.image]
         self.networkRunner = NetworkRunner(self)
-        self.action = pt.tensor([[0, 0, 0, 0]])
+        self.action = pt.tensor([0, 0, 0, 0])
 
         # comment out the next line to start a new model with the model path file name
         # self.networkRunner.agent.load_models(MODEL_PATH)

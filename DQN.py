@@ -204,7 +204,7 @@ class Agent:
         # self.target_net = DQN(self.n_actions * 4, self.n_actions * 4, screen_height, screen_width, self).to(device)
         self.target_net = UnitNN(screen_height * 2, screen_width, self.n_actions * 4, self).to(device)
 
-        self.optimizer = pto.RMSprop(self.policy_net.parameters(), lr=0.0001)
+        self.optimizer = pto.RMSprop(self.policy_net.parameters(), lr=1e-04)
         # self.unit_optimizer = [pto.RMSprop(self.unit_net[0].parameters()), pto.RMSprop(self.unit_net[1].parameters()),
         #                        pto.RMSprop(self.unit_net[2].parameters()), pto.RMSprop(self.unit_net[3].parameters())]
 

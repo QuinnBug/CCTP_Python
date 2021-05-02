@@ -15,7 +15,7 @@ import numpy as np
 BATCH_SIZE = 128
 GAMMA = 0.999
 EPS_START = 0.9
-EPS_END = 0.05
+EPS_END = 0.01
 EPS_DECAY = 500
 TARGET_UPDATE = 25
 SCREEN_SIZE = 16
@@ -93,21 +93,20 @@ class NetworkRunner:
         print(self.pass_through.reward)
         print(self.receiver.action)
 
+        if self.episode_cntr % 10 == 0:
+            self.optimize_model()
+            self.plot_graphs()
+            self.plot_losses()
+
         # Select an action to send to the env
         if not self.done:
             # self.receiver.action = self.agent.select_action(self.pass_through)
             self.receiver.action = self.agent.select_action(self.state)
         else:
             print("done")
-            self.optimize_model()
             self.agent.episode_durations.append(self.episode_cntr)
             self.agent.episode_scores.append(self.receiver.cumulative_reward)
-            self.receiver.image = Image.open("BlackScreen_128.png")
-
-            if self.receiver.game_cntr % 10 == 0:
-                self.plot_graphs()
-                self.plot_losses()
-
+            self.receiver.image = None
             self.episode_cntr = 0
             self.current_screen = self.get_screen()
             self.state = pt.stack(self.current_screen).squeeze(1)
@@ -150,15 +149,15 @@ class NetworkRunner:
 
         next_state_values = pt.zeros((BATCH_SIZE, 4), device=self.agent.device)
 
-        print(self.agent.target_net(non_final_next_states))
+        # print(self.agent.target_net(non_final_next_states))
         next_state_values[non_final_mask] = self.agent.target_net(non_final_next_states).max(1)[0]
-        print(next_state_values)
+        # print(next_state_values)
         expected_state_action_values = (next_state_values * GAMMA) + reward_batch
         loss = ptnnf.smooth_l1_loss(state_action_values, expected_state_action_values)
         self.agent.optimizer.zero_grad()
         print("loss")
-        print(loss)
         loss.backward()
+        print(loss)
         self.losses.append(loss)
 
         for param in self.agent.policy_net.parameters():
@@ -210,26 +209,6 @@ class NetworkRunner:
         if self.is_ipython:
             display.clear_output(wait=True)
             display.display(plt.gcf())
-
-        # losses_t = [pt.tensor(self.unit_losses[0], dtype=pt.float), pt.tensor(self.unit_losses[1], dtype=pt.float),
-        #             pt.tensor(self.unit_losses[2], dtype=pt.float), pt.tensor(self.unit_losses[3], dtype=pt.float)]
-        # if len(losses_t) < 1:
-        #     return
-        #
-        # plt.figure(4)
-        # plt.clf()
-        # plt.title('Convolutional NN Loss')
-        # plt.xlabel('Steps')
-        # plt.ylabel('Loss')
-        # plt.plot(losses_t[0].numpy())
-        # plt.plot(losses_t[1].numpy())
-        # plt.plot(losses_t[2].numpy())
-        # plt.plot(losses_t[3].numpy())
-        #
-        # plt.pause(0.001)  # pause a bit so that plots are updated
-        # if self.is_ipython:
-        #     display.clear_output(wait=True)
-        #     display.display(plt.gcf())
 
     def plot_graphs(self):
         plt.figure(2)

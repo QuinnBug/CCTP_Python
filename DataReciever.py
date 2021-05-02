@@ -26,9 +26,9 @@ class ImageReceiver:
         self.game_cntr = 0
         self.highest_score = -999
         self.data = []
-        self.image = Image.open("BlackScreen_128.png")
+        self.image = None
         self.images = [self.image, self.image, self.image, self.image, self.image]
-        self.networkRunner = NetworkRunner(self)
+        self.networkRunner = None
         self.action = pt.tensor([0, 0, 0, 0])
 
         # comment out the next line to start a new model with the model path file name
@@ -88,6 +88,9 @@ class ImageReceiver:
                                 self.images[2] = Image.open(io.BytesIO(img_data[2]))
                                 self.images[3] = Image.open(io.BytesIO(img_data[3]))
                                 self.images[4] = Image.open(io.BytesIO(img_data[4]))
+
+                                if self.networkRunner is None:
+                                    self.networkRunner = NetworkRunner(self)
 
                                 self.networkRunner.run()
 

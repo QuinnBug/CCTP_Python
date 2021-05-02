@@ -13,10 +13,10 @@ import numpy as np
 BATCH_SIZE = 128
 GAMMA = 0.999
 EPS_START = 0.9
-EPS_END = 0.001
-EPS_DECAY = 500
-TARGET_UPDATE = 25
-SCREEN_SIZE = 64
+EPS_END = 0.01
+EPS_DECAY = 200
+TARGET_UPDATE = 50
+SCREEN_SIZE = 16
 ACTION_COUNT = 4
 
 resize = tv.Compose([tv.Resize(SCREEN_SIZE, interpolation=Image.CUBIC),
@@ -52,6 +52,7 @@ class NetworkRunner:
         self.previous_state = self.state
         self.previous_action = pt.tensor([[0, 0, 0, 0]])
         self.losses = []
+        self.avg_losses = []
 
     def blend_screens(self):
         # image1 = tv.ToPILImage()(np.squeeze(self.current_screen))
@@ -69,16 +70,12 @@ class NetworkRunner:
         # return resize(self.blended_img).unsqueeze(0).to(self.device)
 
     def run(self):
-        self.reward = pt.tensor([self.receiver.reward], device=self.device)
+        self.reward = pt.tensor([self.receiver.rewards], device=self.device)
         self.done = self.receiver.game_over
 
-        # Observe new state and update last screens
-        # self.last_screens[2] = self.last_screens[1]
-        # self.last_screens[1] = self.last_screens[0]
-        # self.last_screens[0] = self.current_screen
+        # Observe new state
         self.current_screen = self.get_screen()
 
-        # self.plot_state(self.last_screen, name="last", figure=5)
         # self.plot_state(self.current_screen, name="current", figure=6)
 
         if not self.done:
@@ -98,15 +95,14 @@ class NetworkRunner:
 
         # Perform one step of the optimization (on the target network)
         self.optimize_model()
+        self.plot_graphs()
+        self.plot_losses()
 
         if self.done:
             print("done")
             self.agent.episode_durations.append(self.episode_cntr)
             self.agent.episode_scores.append(self.receiver.cumulative_reward)
             self.receiver.image = Image.open("BlackScreen_128.png")
-            if self.receiver.game_cntr % 5 == 0:
-                self.plot_graphs()
-                # self.plot_losses()
 
             self.episode_cntr = 0
             self.current_screen = self.get_screen()
@@ -140,23 +136,31 @@ class NetworkRunner:
 
         state_action_values = self.agent.policy_net(state_batch).gather(1, action_batch)
 
-        next_state_values = pt.zeros(BATCH_SIZE, device=self.agent.device)
+        next_state_values = pt.zeros((BATCH_SIZE, 4), device=self.agent.device)
 
-        next_state_values[non_final_mask] = self.agent.target_net(non_final_next_states).max(1)[0][0].detach()
+        o = self.agent.target_net(non_final_next_states).max(1)[0]
+        o = o.reshape(int(o.shape[0]/4), 4)
+        next_state_values[non_final_mask] = o.detach()
 
         # print("debug")
         # print(next_state_values[non_final_mask])
 
         expected_state_action_values = (next_state_values * GAMMA) + reward_batch
-
-        loss = ptnnf.smooth_l1_loss(state_action_values, expected_state_action_values.unsqueeze(1))
+        loss = ptnnf.smooth_l1_loss(state_action_values, expected_state_action_values)
         self.agent.optimizer.zero_grad()
 
+        print("loss")
+        print(loss)
         loss.backward()
+        print(loss)
 
-        # print("loss")
-        # print(loss)
         self.losses.append(loss)
+        t = 0
+        for i in range(len(self.losses)):
+            t += self.losses[i]
+
+        t = t / len(self.losses)
+        self.avg_losses.append(t)
 
         for param in self.agent.policy_net.parameters():
             param.grad.data.clamp_(-1, 1)
@@ -179,18 +183,17 @@ class NetworkRunner:
         screen = self.receiver.images[3]
         x.append(resize(screen))
 
-        # screen = self.receiver.images[4]
-        # x.append(resize(screen))
+        screen = self.receiver.images[4]
+        x.append(resize(screen))
 
-        # self.plot_state(x[0], name="current 1", figure=6)
-        # self.plot_state(x[1], name="current 2", figure=7)
-        # self.plot_state(x[2], name="current 3", figure=8)
-        # self.plot_state(x[3], name="current 4", figure=9)
-        # self.plot_state(x[4], name="current 5", figure=10)
+        y = [pt.cat([x[0], x[4]], dim=1), pt.cat([x[1], x[4]], dim=1),
+             pt.cat([x[2], x[4]], dim=1), pt.cat([x[3], x[4]], dim=1)]
 
-        x = pt.stack(x)
-        # print(x.shape)
-        return x
+        self.plot_state(pt.cat([pt.cat([y[0], y[1]], dim=2), pt.cat([y[2], y[3]], dim=2)],
+                               dim=1), name="current 1", figure=6)
+
+        y = pt.stack(y)
+        return y
 
     def plot_state(self, state, figure=4, name="state"):
         plt.figure(figure)
@@ -203,10 +206,11 @@ class NetworkRunner:
             display.display(plt.gcf())
 
     def plot_losses(self):
+        if len(self.losses) < 1:
+            return
 
         losses_t = pt.tensor(self.losses, dtype=pt.float)
-        if len(losses_t) < 1:
-            return
+        avg_t = pt.tensor(self.avg_losses, dtype=pt.float)
 
         plt.figure(3)
         plt.clf()
@@ -214,11 +218,16 @@ class NetworkRunner:
         plt.xlabel('Episode')
         plt.ylabel('loss')
         plt.plot(losses_t.numpy())
+        plt.plot(avg_t.numpy())
 
         plt.pause(0.001)  # pause a bit so that plots are updated
         if self.is_ipython:
             display.clear_output(wait=True)
             display.display(plt.gcf())
+
+        avg_t = pt.tensor(self.avg_losses, dtype=pt.float)
+
+        plt.plot(avg_t.numpy())
 
     def plot_graphs(self):
         plt.figure(2)

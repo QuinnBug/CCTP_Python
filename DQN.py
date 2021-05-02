@@ -37,19 +37,19 @@ class ReplayMemory(object):
 class DQN(ptnn.Module):
     def __init__(self, h, w, outputs):
         super(DQN, self).__init__()
-        self.conv1 = ptnn.Conv2d(3, 6, kernel_size=KERNEL, stride=STRIDE)
-        self.bn1 = ptnn.BatchNorm2d(6)
-        self.conv2 = ptnn.Conv2d(6, 12, kernel_size=KERNEL, stride=STRIDE)
-        self.bn2 = ptnn.BatchNorm2d(12)
-        self.conv3 = ptnn.Conv2d(12, 12, kernel_size=KERNEL, stride=STRIDE)
-        self.bn3 = ptnn.BatchNorm2d(12)
+        self.conv1 = ptnn.Conv2d(3, 16, kernel_size=KERNEL, stride=STRIDE)
+        self.bn1 = ptnn.BatchNorm2d(16)
+        self.conv2 = ptnn.Conv2d(16, 32, kernel_size=KERNEL, stride=STRIDE)
+        self.bn2 = ptnn.BatchNorm2d(32)
+        self.conv3 = ptnn.Conv2d(32, 16, kernel_size=KERNEL, stride=STRIDE)
+        self.bn3 = ptnn.BatchNorm2d(16)
 
         def conv2d_size_out(size, kernel_size=KERNEL, stride=STRIDE):
             return (size - (kernel_size - 1) - 1) // stride + 1
 
         convw = conv2d_size_out(conv2d_size_out(conv2d_size_out(w)))
         convh = conv2d_size_out(conv2d_size_out(conv2d_size_out(h)))
-        linear_input_size = convw * convh * 12
+        linear_input_size = convw * convh * 16
         # print("debug DQN messages")
         # print(convh)
         # print(convw)
@@ -85,8 +85,8 @@ class Agent:
 
         self.policy_net = DQN(screen_height, screen_width, self.n_actions).to(device)
         self.target_net = DQN(screen_height, screen_width, self.n_actions).to(device)
-        self.optimizer = pto.RMSprop(self.policy_net.parameters())
-        self.memory = ReplayMemory(10000)
+        self.optimizer = pto.RMSprop(self.policy_net.parameters(), lr=1e-07)
+        self.memory = ReplayMemory(1000000)
 
         self.episode_durations = []
         self.episode_scores = []
@@ -136,13 +136,12 @@ class Agent:
         # sample += 1
 
         if sample > eps_threshold:
-            # print("best action")
+            print("best action")
             with pt.no_grad():
-                x = self.policy_net(state).max(1)[1].view(1, 4)
-                # x = pt.tensor((x[0], x[1], x[2], x[3]))
-                return x
+                x = self.policy_net(state)
+                return x.max(1)[1].view(1, 4)
         else:
-            # print("random action")
+            print("random action")
             return pt.tensor([[random.randrange(self.n_actions), random.randrange(self.n_actions),
                               random.randrange(self.n_actions), random.randrange(self.n_actions)]],
                              device=self.device, dtype=pt.long)

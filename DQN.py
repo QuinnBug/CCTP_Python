@@ -10,7 +10,7 @@ Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward'))
 
 STRIDE = 1
-KERNEL = 5
+KERNEL = 6
 CAM_COUNT = 5
 
 

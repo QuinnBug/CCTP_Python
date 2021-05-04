@@ -53,8 +53,6 @@ class NetworkRunner:
         self.reward = pt.tensor([0], device=self.device)
         self.done = False
 
-        # self.previous_state = self.state
-        # self.previous_action = pt.tensor([0])
         self.losses = []
         self.unit_losses = [[], [], [], []]
 
@@ -96,7 +94,6 @@ class NetworkRunner:
 
         # Select an action to send to the env
         if not self.done:
-            # self.receiver.action = self.agent.select_action(self.pass_through)
             self.receiver.action = self.agent.select_action(self.state)
         else:
             print("done")
@@ -115,8 +112,6 @@ class NetworkRunner:
         # Update the target network, copying all weights and biases in the networks
         if self.episode_cntr % TARGET_UPDATE == 0:
             self.agent.target_net.load_state_dict(self.agent.policy_net.state_dict())
-            # for i in range(4):
-            #   self.agent.target_unit_net[i].load_state_dict(self.agent.unit_net[i].state_dict())
 
         self.episode_cntr += 1
 
@@ -169,7 +164,6 @@ class NetworkRunner:
         x.append(resize(screen).unsqueeze(0))
 
         screen = self.receiver.images[4]
-        # self.ov_screen = resize(screen).unsqueeze(0)
         x.append(resize(screen).unsqueeze(0))
 
         return x
@@ -205,32 +199,11 @@ class NetworkRunner:
     def plot_graphs(self):
         plt.figure(2)
         plt.clf()
-        # durations_t = pt.tensor(self.agent.episode_durations, dtype=pt.float)
         scores_t = pt.tensor(self.agent.episode_scores, dtype=pt.float)
         plt.title('Training...')
         plt.xlabel('Episode')
         plt.ylabel('Duration & Score')
-        # plt.plot(durations_t.numpy())
         plt.plot(scores_t.numpy())
-
-        # if len(durations_t) >= 100:
-        #     means = durations_t.unfold(0, 100, 1).mean(1).view(-1)
-        #     means = pt.cat((pt.zeros(99), means))
-        #     plt.plot(means.numpy())
-
-        if len(scores_t) % 100 == 0 & len(scores_t) >= 100:
-            hundo_count = len(scores_t) / 100
-            i = 0
-            j = 0
-            self.agent.score_means = []
-            while i <= hundo_count:
-                while j <= 100:
-                    self.agent.score_means.append(np.sum(self.agent.episode_scores[i * 100, (i * 100) + 101]))
-                    j += 1
-                i += 1
-
-        if len(scores_t) >= 100:
-            plt.plot(self.agent.score_means)
 
         plt.pause(0.001)  # pause a bit so that plots are updated
         if self.is_ipython:

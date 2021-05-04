@@ -54,7 +54,7 @@ class NetworkRunner:
         self.done = False
 
         self.losses = []
-        self.unit_losses = [[], [], [], []]
+        self.avg_losses = []
 
         self.pass_through = Overview(processed_actions=0, image=0, reward=[0, 0, 0, 0])
 
@@ -147,6 +147,13 @@ class NetworkRunner:
         loss.backward()
         self.losses.append(loss)
 
+        t = 0
+        for i in range(len(self.losses)):
+            t += self.losses[i]
+
+        t = t / len(self.losses)
+        self.avg_losses.append(t)
+
         for param in self.agent.policy_net.parameters():
             param.grad.data.clamp(-1, 1)
         self.agent.optimizer.step()
@@ -179,17 +186,19 @@ class NetworkRunner:
             display.display(plt.gcf())
 
     def plot_losses(self):
+        if len(self.losses) < 1:
+            return
 
         losses_t = pt.tensor(self.losses, dtype=pt.float)
-        if len(losses_t) < 1:
-            return
+        avg_t = pt.tensor(self.avg_losses, dtype=pt.float)
 
         plt.figure(3)
         plt.clf()
-        plt.title('Fully Connected Loss')
+        plt.title('Loss over time')
         plt.xlabel('Steps')
         plt.ylabel('Loss')
         plt.plot(losses_t.numpy())
+        plt.plot(avg_t.numpy())
 
         plt.pause(0.001)  # pause a bit so that plots are updated
         if self.is_ipython:

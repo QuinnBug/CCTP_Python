@@ -50,10 +50,7 @@ class DQN(ptnn.Module):
         convw = conv2d_size_out(conv2d_size_out(conv2d_size_out(w)))
         convh = conv2d_size_out(conv2d_size_out(conv2d_size_out(h)))
         linear_input_size = convw * convh * 16
-        # print("debug DQN messages")
-        # print(convh)
-        # print(convw)
-        # print(linear_input_size)
+
         self.fc1 = ptnn.Linear(linear_input_size, 24)
         self.fc2 = ptnn.Linear(24, outputs)
 
@@ -72,7 +69,6 @@ class Agent:
         self.load = load_path
         self.device = device
 
-        # Set self.params
         self.n_actions = n_actions
         self.eps_start = eps_start
         self.eps_min = eps_min
@@ -85,7 +81,7 @@ class Agent:
 
         self.policy_net = DQN(screen_height, screen_width, self.n_actions).to(device)
         self.target_net = DQN(screen_height, screen_width, self.n_actions).to(device)
-        self.optimizer = pto.RMSprop(self.policy_net.parameters(), lr=1e-07)
+        self.optimizer = pto.RMSprop(self.policy_net.parameters(), lr=1e-06)
         self.memory = ReplayMemory(1000000)
 
         self.episode_durations = []

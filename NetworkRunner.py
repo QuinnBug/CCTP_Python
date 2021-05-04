@@ -14,8 +14,8 @@ BATCH_SIZE = 128
 GAMMA = 0.999
 EPS_START = 0.9
 EPS_END = 0.01
-EPS_DECAY = 1000
-TARGET_UPDATE = 50
+EPS_DECAY = 500
+TARGET_UPDATE = 25
 SCREEN_SIZE = 16
 ACTION_COUNT = 4
 
@@ -38,12 +38,9 @@ class NetworkRunner:
                            screen_size=SCREEN_SIZE, network_runner=self)
 
         # Initialize the environment and state
-        # self.last_screen = self.get_screen()
         self.current_screen = self.get_screen()
-        self.blended_img = self.current_screen
-        self.last_screens = [self.current_screen, self.current_screen, self.current_screen]
 
-        self.state = self.blend_screens()
+        self.state = self.current_screen
         self.episode_cntr = 1
 
         self.reward = pt.tensor([0], device=self.device)
@@ -54,21 +51,6 @@ class NetworkRunner:
         self.losses = []
         self.avg_losses = []
 
-    def blend_screens(self):
-        # image1 = tv.ToPILImage()(np.squeeze(self.current_screen))
-        # image2 = tv.ToPILImage()(np.squeeze(self.last_screens[0]))
-        # image3 = tv.ToPILImage()(np.squeeze(self.last_screens[1]))
-        # image4 = tv.ToPILImage()(np.squeeze(self.last_screens[2]))
-
-        # self.blended_img = Image.blend(image1, image2, alpha=0.05)
-        # self.blended_img = Image.blend(self.blended_img, image3, alpha=0.03)
-        # self.blended_img = Image.blend(self.blended_img, image4, alpha=0.01).convert("RGB")
-
-        self.blended_img = self.current_screen
-
-        return self.blended_img
-        # return resize(self.blended_img).unsqueeze(0).to(self.device)
-
     def run(self):
         self.reward = pt.tensor([self.receiver.rewards], device=self.device)
         self.done = self.receiver.game_over
@@ -76,10 +58,8 @@ class NetworkRunner:
         # Observe new state
         self.current_screen = self.get_screen()
 
-        # self.plot_state(self.current_screen, name="current", figure=6)
-
         if not self.done:
-            next_state = self.blend_screens()
+            next_state = self.current_screen
         else:
             next_state = None
 
@@ -106,8 +86,7 @@ class NetworkRunner:
 
             self.episode_cntr = 0
             self.current_screen = self.get_screen()
-            self.last_screens = [self.current_screen, self.current_screen, self.current_screen]
-            self.state = self.blend_screens()
+            self.state = self.current_screen
             self.receiver.reward = 0
             self.reward = pt.tensor([0], device=self.device)
             self.done = False
@@ -118,8 +97,6 @@ class NetworkRunner:
             self.agent.target_net.load_state_dict(self.agent.policy_net.state_dict())
 
         self.episode_cntr += 1
-
-        # self.plot_state(self.state, name="state")
 
     def optimize_model(self):
         if len(self.agent.memory) < BATCH_SIZE:
@@ -142,17 +119,11 @@ class NetworkRunner:
         o = o.reshape(int(o.shape[0]/4), 4)
         next_state_values[non_final_mask] = o.detach()
 
-        # print("debug")
-        # print(next_state_values[non_final_mask])
-
         expected_state_action_values = (next_state_values * GAMMA) + reward_batch
         loss = ptnnf.smooth_l1_loss(state_action_values, expected_state_action_values)
         self.agent.optimizer.zero_grad()
 
-        print("loss")
-        print(loss)
         loss.backward()
-        print(loss)
 
         self.losses.append(loss)
         t = 0
@@ -168,8 +139,6 @@ class NetworkRunner:
 
     def get_screen(self):
         x = []
-
-        # think about a for loop? not super needed but would be useful
 
         screen = self.receiver.images[0]
         x.append(resize(screen))

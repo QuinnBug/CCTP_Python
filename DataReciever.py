@@ -3,12 +3,10 @@ import torch as pt
 from NetworkRunner import NetworkRunner
 from PIL import Image
 import io
-import random
 
 HOST = '127.0.0.1'
 PORT = 65432
 SIZE = 800000
-MODEL_PATH = "D:/Documents/Coding/CCTP_Model/model_2"
 
 
 class ImageReceiver:
@@ -29,16 +27,10 @@ class ImageReceiver:
         self.networkRunner = None
         self.action = pt.tensor([[0, 0, 0, 0]])
 
-        # comment out the next line to start a new model with the model path file name
-        # self.networkRunner.agent.load_models(MODEL_PATH)
-
     def update(self):
         if self.listening == 0:
             # listen for data and say we're listening for data
             self.receive()
-
-    def save_models(self):
-        self.networkRunner.agent.save_models(MODEL_PATH)
 
     def receive(self):
         with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
@@ -71,11 +63,9 @@ class ImageReceiver:
                             img_data[3] = b'\x89PNG' + img_data[4]
                             img_data[4] = b'\x89PNG' + img_data[5]
 
-                            # self.data = data[3:]
                             self.cumulative_reward += self.reward
 
                             if data[9] == 0x89:
-                                # self.image = Image.open(io.BytesIO(self.data))
                                 self.images[0] = Image.open(io.BytesIO(img_data[0]))
                                 self.images[1] = Image.open(io.BytesIO(img_data[1]))
                                 self.images[2] = Image.open(io.BytesIO(img_data[2]))
@@ -87,26 +77,16 @@ class ImageReceiver:
 
                                 self.networkRunner.run()
 
-                                # print(self.action)
-
                                 ba = self.action.numpy().tobytes()
                                 conn.sendall(ba)
                                 print("completed episode/game: ")
                                 print(self.networkRunner.episode_cntr)
                                 print(self.game_cntr)
-                                # print("action:")
-                                # print(ba)
-                                # print("reward = ")
-                                # print(self.reward)
-                                # print(self.cumulative_reward)
 
                                 if self.game_over:
                                     print("cumulative reward = ")
                                     print(self.cumulative_reward)
-                                    # print("highest reward = ")
-                                    # print(self.highest_score)
 
-                                    # update the highest score
                                     if self.cumulative_reward > self.highest_score:
                                         self.highest_score = self.cumulative_reward
 

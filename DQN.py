@@ -80,15 +80,10 @@ class DQN(ptnn.Module):
             img = pt.cat(img)
 
             tens = pt.cat(tens)
-            # print("shapes _ multi image")
 
         else:
-            # print("shapes _ single image")
             img = x.image
             tens = x.processed_actions
-
-        # print(img.shape)
-        # print(tens.shape)
 
         x = ptnnf.relu(self.bn1(self.conv1(img)))
         x = ptnnf.relu(self.bn2(self.conv2(x)))
@@ -214,32 +209,6 @@ class Agent:
                        self.unit_net[1](state[1]),
                        self.unit_net[2](state[2]),
                        self.unit_net[3](state[3])]
-
-        # sample = random.random()
-        # eps_threshold =
-        # self.eps_min + (self.eps_start - self.eps_min) * math.exp(-1. * self.steps_done / self.eps_dec)
-        #
-        # if self.nr.receiver.game_cntr % 100 == 0:
-        #     sample += 1
-        #
-        # sample += 1
-        #
-        # if sample > eps_threshold:
-        #     print("best action ap")
-        #
-        # else:
-        #     print("random action ap")
-        #
-        #     cap = 5
-        #
-        #     outputs = [pt.tensor(((random.randrange(-cap, cap)), (random.randrange(-cap, cap)),
-        #                          (random.randrange(-cap, cap)), (random.randrange(-cap, cap)))).unsqueeze(0),
-        #                pt.tensor(((random.randrange(-cap, cap)), (random.randrange(-cap, cap)),
-        #                           (random.randrange(-cap, cap)), (random.randrange(-cap, cap)))).unsqueeze(0),
-        #                pt.tensor(((random.randrange(-cap, cap)), (random.randrange(-cap, cap)),
-        #                           (random.randrange(-cap, cap)), (random.randrange(-cap, cap)))).unsqueeze(0),
-        #                pt.tensor(((random.randrange(-cap, cap)), (random.randrange(-cap, cap)),
-        #                           (random.randrange(-cap, cap)), (random.randrange(-cap, cap)))).unsqueeze(0)]
         return outputs
 
     def select_action(self, state):
@@ -253,13 +222,11 @@ class Agent:
         # sample += 1
 
         if sample > eps_threshold:
-            # print("best action sa")
             with pt.no_grad():
                 x = self.policy_net(state)
 
                 return x.max(1)[1]
         else:
-            # print("random action sa")
             return pt.tensor([[random.randrange(self.n_actions),
                               random.randrange(self.n_actions),
                               random.randrange(self.n_actions),

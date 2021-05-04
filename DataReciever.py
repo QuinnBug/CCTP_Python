@@ -39,8 +39,8 @@ class ImageReceiver:
             # listen for data and say we're listening for data
             self.receive()
 
-    def save_models(self):
-        self.networkRunner.agent.save_models(MODEL_PATH)
+    # def save_models(self):
+    #     self.networkRunner.agent.save_models(MODEL_PATH)
 
     def receive(self):
         with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
@@ -66,11 +66,6 @@ class ImageReceiver:
                             self.rewards[3] = int(data[8]) if int(data[7]) == 0 else int(data[8]) * -1
                             self.reward = self.rewards[0] + self.rewards[1] + self.rewards[2] + self.rewards[3]
 
-                            # for i in range(len(self.rewards)):
-                            #     print(self.rewards[i])
-
-                            # print(self.reward)
-
                             img_data = data[9:].split(b'\x89PNG')
                             img_data[0] = b'\x89PNG' + img_data[1]
                             img_data[1] = b'\x89PNG' + img_data[2]
@@ -78,11 +73,9 @@ class ImageReceiver:
                             img_data[3] = b'\x89PNG' + img_data[4]
                             img_data[4] = b'\x89PNG' + img_data[5]
 
-                            # self.data = data[3:]
                             self.cumulative_reward += self.reward
 
                             if data[9] == 0x89:
-                                # self.image = Image.open(io.BytesIO(self.data))
                                 self.images[0] = Image.open(io.BytesIO(img_data[0]))
                                 self.images[1] = Image.open(io.BytesIO(img_data[1]))
                                 self.images[2] = Image.open(io.BytesIO(img_data[2]))
@@ -91,24 +84,15 @@ class ImageReceiver:
 
                                 self.networkRunner.run()
 
-                                # print(self.action)
-
                                 ba = self.action.numpy().tobytes()
                                 conn.sendall(ba)
                                 print("completed episode/game: ")
                                 print(self.networkRunner.episode_cntr)
                                 print(self.game_cntr)
-                                # print("action:")
-                                # print(ba)
-                                # print("reward = ")
-                                # print(self.reward)
-                                # print(self.cumulative_reward)
 
                                 if self.game_over:
                                     print("cumulative reward = ")
                                     print(self.cumulative_reward)
-                                    # print("highest reward = ")
-                                    # print(self.highest_score)
 
                                     # update the highest score
                                     if self.cumulative_reward > self.highest_score:

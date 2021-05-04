@@ -15,8 +15,8 @@ import numpy as np
 BATCH_SIZE = 128
 GAMMA = 0.999
 EPS_START = 0.9
-EPS_END = 0.05
-EPS_DECAY = 1000
+EPS_END = 0.01
+EPS_DECAY = 500
 TARGET_UPDATE = 25
 SCREEN_SIZE = 16
 ACTION_COUNT = 4
@@ -56,7 +56,9 @@ class NetworkRunner:
         self.previous_state = self.state
         self.previous_action = pt.tensor([0])
         self.losses = []
+        self.avg_losses = []
         self.unit_losses = [[], [], [], []]
+        self.avg_unit_losses = [[], [], [], []]
 
         self.pass_through = Overview(processed_actions=pt.stack(self.agent.action_processing(self.state)),
                                      image=self.ov_screen, reward=[0, 0, 0, 0])
@@ -69,10 +71,6 @@ class NetworkRunner:
         self.current_screen = self.get_screen()
 
         self.plot_state(self.ov_screen, 6, "overview")
-        # self.plot_state(self.current_screen[0], 7, "current 1")
-        # self.plot_state(self.current_screen[1], 8, "current 2")
-        # self.plot_state(self.current_screen[2], 9, "current 3")
-        # self.plot_state(self.current_screen[3], 10, "current 4")
 
         if not self.done:
             next_state = self.current_screen
@@ -90,20 +88,18 @@ class NetworkRunner:
         self.state = next_state
         self.pass_through = next_pass
 
+        self.optimize_model()
+        self.plot_graphs()
+        self.plot_losses()
+
         # Select an action to send to the env
         if not self.done:
             self.receiver.action = self.agent.select_action(self.pass_through)
         else:
             print("done")
-            self.optimize_model()
             self.agent.episode_durations.append(self.episode_cntr)
             self.agent.episode_scores.append(self.receiver.cumulative_reward)
             self.receiver.image = Image.open("BlackScreen_128.png")
-
-            if self.receiver.game_cntr % 10 == 0:
-                self.plot_graphs()
-                self.plot_losses()
-
             self.episode_cntr = 0
             self.current_screen = self.get_screen()
             self.state = self.current_screen
@@ -140,30 +136,31 @@ class NetworkRunner:
         non_final_next_passes = pt.cat([pt.ones(1), pt.tensor(x)]).unsqueeze(1)
         pass_batch = pt.cat([pt.zeros(1), pt.tensor(y)]).unsqueeze(1)
 
-        # action_batch = pt.cat([pt.zeros(1), pt.cat(batch.action)]).unsqueeze(1)
-        # print("batches")
-        # print(batch.action)
-        # for i in range(len(batch.action)):
-        #    print(batch.action[i])
-
         action_batch = pt.cat(batch.action).unsqueeze(1)
         reward_batch = pt.cat(batch.reward)
 
-        # action_batch = action_batch.to(pt.int64)
-
-        # print(action_batch)
-        # print(pass_batch)
-
         pass_action_values = self.agent.policy_net(pass_batch).gather(1, action_batch)
-        next_pass_values = pt.zeros(BATCH_SIZE, 4, device=self.agent.device)
+        next_pass_values = pt.zeros((BATCH_SIZE, 4), device=self.agent.device)
         next_pass_values[non_final_mask] = self.agent.target_net(non_final_next_passes).max(1)[0][0].detach()
+
+        x = []
+        for j in range(BATCH_SIZE):
+            x.append(pt.tensor([batch.pass_through[j].reward[0], batch.pass_through[j].reward[1],
+                               batch.pass_through[j].reward[2], batch.pass_through[j].reward[3]]))
 
         rb_ext = reward_batch.unsqueeze(1)
         rb_ext = rb_ext.repeat(1, 4)
 
-        # print(rb_ext.shape)
-        # print((next_pass_values * GAMMA).shape)
-        expected_pass_action_values = (next_pass_values * GAMMA) + rb_ext
+        print("test")
+        print(reward_batch.shape)
+
+        reward_batch = pt.stack(x)
+
+        print(rb_ext.shape)
+        print(reward_batch.shape)
+
+        # expected_pass_action_values = (next_pass_values * GAMMA) + rb_ext
+        expected_pass_action_values = (next_pass_values * GAMMA) + reward_batch
 
         loss = ptnnf.smooth_l1_loss(pass_action_values, expected_pass_action_values.unsqueeze(1))
         self.agent.optimizer.zero_grad()
@@ -171,6 +168,13 @@ class NetworkRunner:
         loss.backward()
 
         self.losses.append(loss)
+
+        t = 0
+        for i in range(len(self.losses)):
+            t += self.losses[i]
+
+        t = t / len(self.losses)
+        self.avg_losses.append(t)
 
         for param in self.agent.policy_net.parameters():
             param.grad.data.clamp_(-1, 1)
@@ -219,20 +223,10 @@ class NetworkRunner:
             pass_batch = pass_batch.unsqueeze(1).repeat(1, 4)
             reward_batch = pt.stack(x)
 
-            # action_batch = pt.cat(batch.action).unsqueeze(1)
-            # print("unit batches")
-            # print(pass_batch)
-            # print(pass_batch.shape)
-            # print(state_batch.shape)
-            # print(self.agent.unit_net[i](state_batch).shape)
-
             state_pass_values = self.agent.unit_net[i](state_batch).gather(0, pass_batch)
             next_state_values = pt.zeros(BATCH_SIZE, device=self.agent.device)
             next_state_values[non_final_mask] = self.agent.target_unit_net[i](non_final_next_states).max(1)[0].detach()
             expected_state_pass_values = (next_state_values * GAMMA) + reward_batch
-
-            # print(state_pass_values.shape)
-            # print(expected_state_pass_values.shape)
 
             expected_state_pass_values = expected_state_pass_values.unsqueeze(1).repeat(1, 4)
 
@@ -242,6 +236,12 @@ class NetworkRunner:
             unit_loss.backward()
 
             self.unit_losses[i].append(unit_loss)
+            t = 0
+            for j in range(len(self.unit_losses[i])):
+                t += self.unit_losses[i][j]
+
+            t = t / len(self.unit_losses[i])
+            self.avg_unit_losses[i].append(t)
 
             for param in self.agent.unit_net[i].parameters():
                 param.grad.data.clamp_(-1, 1)
@@ -275,10 +275,11 @@ class NetworkRunner:
             display.display(plt.gcf())
 
     def plot_losses(self):
+        if len(self.losses) < 1:
+            return
 
         losses_t = pt.tensor(self.losses, dtype=pt.float)
-        if len(losses_t) < 1:
-            return
+        avg_t = pt.tensor(self.avg_losses, dtype=pt.float)
 
         plt.figure(3)
         plt.clf()
@@ -286,6 +287,7 @@ class NetworkRunner:
         plt.xlabel('Steps')
         plt.ylabel('Loss')
         plt.plot(losses_t.numpy())
+        plt.plot(avg_t.numpy())
 
         plt.pause(0.001)  # pause a bit so that plots are updated
         if self.is_ipython:
@@ -294,6 +296,8 @@ class NetworkRunner:
 
         losses_t = [pt.tensor(self.unit_losses[0], dtype=pt.float), pt.tensor(self.unit_losses[1], dtype=pt.float),
                     pt.tensor(self.unit_losses[2], dtype=pt.float), pt.tensor(self.unit_losses[3], dtype=pt.float)]
+        avg_t = [pt.tensor(self.avg_unit_losses[0], dtype=pt.float), pt.tensor(self.avg_unit_losses[1], dtype=pt.float),
+                 pt.tensor(self.avg_unit_losses[2], dtype=pt.float), pt.tensor(self.avg_unit_losses[3], dtype=pt.float)]
         if len(losses_t) < 1:
             return
 
@@ -306,6 +310,10 @@ class NetworkRunner:
         plt.plot(losses_t[1].numpy())
         plt.plot(losses_t[2].numpy())
         plt.plot(losses_t[3].numpy())
+        plt.plot(avg_t[0].numpy())
+        plt.plot(avg_t[1].numpy())
+        plt.plot(avg_t[2].numpy())
+        plt.plot(avg_t[3].numpy())
 
         plt.pause(0.001)  # pause a bit so that plots are updated
         if self.is_ipython:
@@ -315,32 +323,11 @@ class NetworkRunner:
     def plot_graphs(self):
         plt.figure(2)
         plt.clf()
-        # durations_t = pt.tensor(self.agent.episode_durations, dtype=pt.float)
         scores_t = pt.tensor(self.agent.episode_scores, dtype=pt.float)
-        plt.title('Training...')
-        plt.xlabel('Episode')
-        plt.ylabel('Duration & Score')
-        # plt.plot(durations_t.numpy())
+        plt.title('Training')
+        plt.xlabel('Games')
+        plt.ylabel('Score')
         plt.plot(scores_t.numpy())
-
-        # if len(durations_t) >= 100:
-        #     means = durations_t.unfold(0, 100, 1).mean(1).view(-1)
-        #     means = pt.cat((pt.zeros(99), means))
-        #     plt.plot(means.numpy())
-
-        if len(scores_t) % 100 == 0 & len(scores_t) >= 100:
-            hundo_count = len(scores_t) / 100
-            i = 0
-            j = 0
-            self.agent.score_means = []
-            while i <= hundo_count:
-                while j <= 100:
-                    self.agent.score_means.append(np.sum(self.agent.episode_scores[i * 100, (i * 100) + 101]))
-                    j += 1
-                i += 1
-
-        if len(scores_t) >= 100:
-            plt.plot(self.agent.score_means)
 
         plt.pause(0.001)  # pause a bit so that plots are updated
         if self.is_ipython:

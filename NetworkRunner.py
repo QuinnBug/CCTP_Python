@@ -68,10 +68,6 @@ class NetworkRunner:
         self.current_screen = self.get_screen()
 
         self.plot_state(self.current_screen[4], 6, "overview")
-        # self.plot_state(self.current_screen[0], 7, "current 1")
-        # self.plot_state(self.current_screen[1], 8, "current 2")
-        # self.plot_state(self.current_screen[2], 9, "current 3")
-        # self.plot_state(self.current_screen[3], 10, "current 4")
 
         if not self.done:
             next_state = pt.stack(self.current_screen).squeeze(1)
@@ -135,29 +131,25 @@ class NetworkRunner:
         non_final_next_states = pt.cat([s for s in batch.next_state if s is not None])
         state_batch = pt.cat(batch.state)
         action_batch = pt.stack(batch.action)
-        print("batches")
+
+        # Creating a tensor batch with each individual units rewards
         x = []
         for j in range(BATCH_SIZE):
             x.append(pt.tensor(batch.pass_through[j].reward))
 
         reward_batch = pt.stack(x)
-        # print(reward_batch.shape)
-        # print(action_batch.shape)
-        # print(state_batch.shape)
 
         state_action_values = self.agent.policy_net(state_batch).max(1)[0].gather(1, action_batch)
 
+        # resized to have dim 1 be 4 wide
         next_state_values = pt.zeros((BATCH_SIZE, 4), device=self.agent.device)
 
-        # print(self.agent.target_net(non_final_next_states))
-        next_state_values[non_final_mask] = self.agent.target_net(non_final_next_states).max(1)[0]
-        # print(next_state_values)
+        next_state_values[non_final_mask] = self.agent.target_net(non_final_next_states).max(1)[0].detach()
         expected_state_action_values = (next_state_values * GAMMA) + reward_batch
         loss = ptnnf.smooth_l1_loss(state_action_values, expected_state_action_values)
+
         self.agent.optimizer.zero_grad()
-        print("loss")
         loss.backward()
-        print(loss)
         self.losses.append(loss)
 
         for param in self.agent.policy_net.parameters():

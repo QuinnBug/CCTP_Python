@@ -178,7 +178,6 @@ class Agent:
         self.load = load_path
         self.device = device
 
-        # Set self.params
         self.n_actions = n_actions
         self.eps_start = eps_start
         self.eps_min = eps_min
@@ -189,24 +188,10 @@ class Agent:
         init_screen = self.nr.get_screen()[0]
         _, _, screen_height, screen_width = init_screen.shape
 
-        # self.unit_net = [UnitNN(screen_height, screen_width, self.n_actions).to(device),
-        #                  UnitNN(screen_height, screen_width, self.n_actions).to(device),
-        #                  UnitNN(screen_height, screen_width, self.n_actions).to(device),
-        #                  UnitNN(screen_height, screen_width, self.n_actions).to(device)]
-        #
-        # self.target_unit_net = [UnitNN(screen_height, screen_width, self.n_actions).to(device),
-        #                         UnitNN(screen_height, screen_width, self.n_actions).to(device),
-        #                         UnitNN(screen_height, screen_width, self.n_actions).to(device),
-        #                         UnitNN(screen_height, screen_width, self.n_actions).to(device)]
-
-        # self.policy_net = DQN(self.n_actions, self.n_actions * 4, screen_height, screen_width, self).to(device)
         self.policy_net = UnitNN(screen_height * 2, screen_width, self.n_actions * 4, self).to(device)
-        # self.target_net = DQN(self.n_actions * 4, self.n_actions * 4, screen_height, screen_width, self).to(device)
         self.target_net = UnitNN(screen_height * 2, screen_width, self.n_actions * 4, self).to(device)
 
-        self.optimizer = pto.RMSprop(self.policy_net.parameters(), lr=1e-04)
-        # self.unit_optimizer = [pto.RMSprop(self.unit_net[0].parameters()), pto.RMSprop(self.unit_net[1].parameters()),
-        #                        pto.RMSprop(self.unit_net[2].parameters()), pto.RMSprop(self.unit_net[3].parameters())]
+        self.optimizer = pto.RMSprop(self.policy_net.parameters(), lr=1e-06)
 
         self.memory = ReplayMemory(1000000)
 
@@ -246,41 +231,6 @@ class Agent:
         self.policy_net.eval()
         self.target_net.eval()
 
-    # def action_processing(self, state):
-        # with pt.no_grad():
-        #     outputs = [self.unit_net[0](state[0]),
-        #                self.unit_net[1](state[1]),
-        #                self.unit_net[2](state[2]),
-        #                self.unit_net[3](state[3])]
-
-        # sample = random.random()
-        # eps_threshold =
-        # self.eps_min + (self.eps_start - self.eps_min) * math.exp(-1. * self.steps_done / self.eps_dec)
-        #
-        # if self.nr.receiver.game_cntr % 100 == 0:
-        #     sample += 1
-        #
-        # sample += 1
-        #
-        # if sample > eps_threshold:
-        #     print("best action ap")
-        #
-        # else:
-        #     print("random action ap")
-        #
-        #     cap = 5
-        #
-        #     outputs = [pt.tensor(((random.randrange(-cap, cap)), (random.randrange(-cap, cap)),
-        #                          (random.randrange(-cap, cap)), (random.randrange(-cap, cap)))).unsqueeze(0),
-        #                pt.tensor(((random.randrange(-cap, cap)), (random.randrange(-cap, cap)),
-        #                           (random.randrange(-cap, cap)), (random.randrange(-cap, cap)))).unsqueeze(0),
-        #                pt.tensor(((random.randrange(-cap, cap)), (random.randrange(-cap, cap)),
-        #                           (random.randrange(-cap, cap)), (random.randrange(-cap, cap)))).unsqueeze(0),
-        #                pt.tensor(((random.randrange(-cap, cap)), (random.randrange(-cap, cap)),
-        #                           (random.randrange(-cap, cap)), (random.randrange(-cap, cap)))).unsqueeze(0)]
-        # return outputs
-        # return state
-
     def select_action(self, state):
         sample = random.random()
         eps_threshold = self.eps_min + (self.eps_start - self.eps_min) * math.exp(-1. * self.steps_done / self.eps_dec)
@@ -289,15 +239,11 @@ class Agent:
         if self.nr.receiver.game_cntr % 100 == 0:
             sample += 1
 
-        sample += 1
+        # sample += 1
 
         if sample > eps_threshold:
-            # print("best action sa")
             with pt.no_grad():
-                # print("x")
                 x = self.policy_net(state)
-                # print(x)
-                # print(x.max(1)[1])
                 return x.max(1)[1]
         else:
             # print("random action sa")

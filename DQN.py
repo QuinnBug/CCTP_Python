@@ -159,11 +159,11 @@ class Agent:
         self.policy_net = DQN(self.n_actions*4, self.n_actions*4, screen_height, screen_width, self).to(device)
         self.target_net = DQN(self.n_actions*4, self.n_actions*4, screen_height, screen_width, self).to(device)
 
-        self.optimizer = pto.RMSprop(self.policy_net.parameters(), lr=1e-06)
-        self.unit_optimizer = [pto.RMSprop(self.unit_net[0].parameters(), lr=1e-06),
-                               pto.RMSprop(self.unit_net[1].parameters(), lr=1e-06),
-                               pto.RMSprop(self.unit_net[2].parameters(), lr=1e-06),
-                               pto.RMSprop(self.unit_net[3].parameters(), lr=1e-06)]
+        self.optimizer = pto.RMSprop(self.policy_net.parameters(), lr=1e-04)
+        self.unit_optimizer = [pto.RMSprop(self.unit_net[0].parameters(), lr=1e-09),
+                               pto.RMSprop(self.unit_net[1].parameters(), lr=1e-09),
+                               pto.RMSprop(self.unit_net[2].parameters(), lr=1e-09),
+                               pto.RMSprop(self.unit_net[3].parameters(), lr=1e-09)]
 
         self.memory = ReplayMemory(1000000)
 

@@ -191,7 +191,7 @@ class Agent:
         self.policy_net = UnitNN(screen_height * 2, screen_width, self.n_actions * 4, self).to(device)
         self.target_net = UnitNN(screen_height * 2, screen_width, self.n_actions * 4, self).to(device)
 
-        self.optimizer = pto.RMSprop(self.policy_net.parameters(), lr=1e-06)
+        self.optimizer = pto.RMSprop(self.policy_net.parameters(), lr=1e-12)
 
         self.memory = ReplayMemory(1000000)
 

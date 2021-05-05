@@ -12,11 +12,11 @@ import numpy as np
 
 # import queue
 
-BATCH_SIZE = 128
+BATCH_SIZE = 2048
 GAMMA = 0.999
 EPS_START = 0.9
 EPS_END = 0.01
-EPS_DECAY = 500
+EPS_DECAY = 3000
 TARGET_UPDATE = 25
 SCREEN_SIZE = 16
 ACTION_COUNT = 4
@@ -83,20 +83,15 @@ class NetworkRunner:
         # Move to the next state
         self.state = next_state
         self.pass_through = next_pass
-        print("reward / action")
-        print(self.pass_through.reward)
-        print(self.receiver.action)
-
-        if self.episode_cntr % 10 == 0:
-            self.optimize_model()
-            self.plot_graphs()
-            self.plot_losses()
 
         # Select an action to send to the env
         if not self.done:
             self.receiver.action = self.agent.select_action(self.state)
         else:
             print("done")
+            self.optimize_model()
+            self.plot_graphs()
+            self.plot_losses()
             self.agent.episode_durations.append(self.episode_cntr)
             self.agent.episode_scores.append(self.receiver.cumulative_reward)
             self.receiver.image = None

@@ -10,11 +10,11 @@ import numpy as np
 
 # import queue
 
-BATCH_SIZE = 128
+BATCH_SIZE = 2048
 GAMMA = 0.999
 EPS_START = 0.9
-EPS_END = 0.01
-EPS_DECAY = 500
+EPS_END = 0.05
+EPS_DECAY = 3000
 TARGET_UPDATE = 25
 SCREEN_SIZE = 16
 ACTION_COUNT = 4
@@ -73,17 +73,14 @@ class NetworkRunner:
         if self.state is not None:
             self.receiver.action = self.agent.select_action(self.state)
 
-        # Perform one step of the optimization (on the target network)
-        self.optimize_model()
-        self.plot_graphs()
-        self.plot_losses()
-
         if self.done:
             print("done")
             self.agent.episode_durations.append(self.episode_cntr)
             self.agent.episode_scores.append(self.receiver.cumulative_reward)
             self.receiver.image = Image.open("BlackScreen_128.png")
-
+            self.optimize_model()
+            self.plot_graphs()
+            self.plot_losses()
             self.episode_cntr = 0
             self.current_screen = self.get_screen()
             self.state = self.current_screen
@@ -158,8 +155,7 @@ class NetworkRunner:
         y = [pt.cat([x[0], x[4]], dim=1), pt.cat([x[1], x[4]], dim=1),
              pt.cat([x[2], x[4]], dim=1), pt.cat([x[3], x[4]], dim=1)]
 
-        self.plot_state(pt.cat([pt.cat([y[0], y[1]], dim=2), pt.cat([y[2], y[3]], dim=2)],
-                               dim=1), name="current 1", figure=6)
+        self.plot_state(y[0], name="unit 1's input", figure=6)
 
         y = pt.stack(y)
         return y

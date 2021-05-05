@@ -81,7 +81,7 @@ class Agent:
 
         self.policy_net = DQN(screen_height, screen_width, self.n_actions).to(device)
         self.target_net = DQN(screen_height, screen_width, self.n_actions).to(device)
-        self.optimizer = pto.RMSprop(self.policy_net.parameters(), lr=1e-06)
+        self.optimizer = pto.RMSprop(self.policy_net.parameters(), lr=1e-04)
         self.memory = ReplayMemory(1000000)
 
         self.episode_durations = []

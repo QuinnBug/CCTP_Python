@@ -12,7 +12,7 @@ import numpy as np
 
 # import queue
 
-BATCH_SIZE = 2048
+BATCH_SIZE = 1024
 GAMMA = 0.999
 EPS_START = 0.9
 EPS_END = 0.01
@@ -158,6 +158,7 @@ class NetworkRunner:
 
         screen = self.receiver.images[0]
         x.append(resize(screen).unsqueeze(0))
+        # self.plot_state(x[0], 7, "Unit #1 View")
         screen = self.receiver.images[1]
         x.append(resize(screen).unsqueeze(0))
         screen = self.receiver.images[2]

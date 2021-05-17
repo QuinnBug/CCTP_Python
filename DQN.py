@@ -88,9 +88,6 @@ class UnitNN(ptnn.Module):
         convh = conv2d_size_out(conv2d_size_out(conv2d_size_out(h)))
         linear_input_size = (convw * convh * 16) * 4
 
-        print(h)
-        print(w)
-
         self.fc1 = ptnn.Linear(linear_input_size, 32)
         self.fc2 = ptnn.Linear(32, 16)
         self.fc3 = ptnn.Linear(16, outputs)
